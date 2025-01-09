@@ -52,7 +52,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "cairo_dcap"
+name = "cairo"
 version = "0.1.0"
 dependencies = [
  "alexandria_bytes",

@@ -1,5 +1,5 @@
 [package]
-name = "rust_dcap"
+name = "cairo_tee"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,10 +7,9 @@ edition = "2021"
 hex = "0.4"
 num-bigint = "0.4"
 serde_json = "1.0"
-dcap-rs = { path = "../dcap-rs" }
+dcap-rs = { git = "https://github.com/automata-network/dcap-rs" }
 x509-parser = { version = "0.15.1" }
 time = { version = "0.3.7", features = ["formatting"] }
-nested_struct_bytes = { path = "./nested_struct_bytes" }
 starknet-types-core = { version = "0.1.0", features = [
     "hash",
     "prime-bigint",

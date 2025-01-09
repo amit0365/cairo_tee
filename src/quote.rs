@@ -36,23 +36,23 @@ fn prepare_parsed_inputs(
 //     //std::fs::write("src/cairo/src/quote_dcapv4_inputs.txt", txt_data).unwrap();
 // }
 
-pub fn verify_p256_signature_bytes_inputs(data: &[u8], signature: &[u8], public_key: &[u8]) {
-    let data_felt: Felt252 = Felt252::from_bytes_be(data.try_into().unwrap());
-    let pubkey_felt = Felt252::from_bytes_be(public_key.try_into().unwrap());
-    let signature_r = &signature[..32];
-    let signature_s = &signature[32..];
-    let signature_r_felt = Felt252::from_bytes_be(signature_r.try_into().unwrap());
-    let signature_s_felt = Felt252::from_bytes_be(signature_s.try_into().unwrap());
+// pub fn verify_p256_signature_bytes_inputs(data: &[u8], signature: &[u8], public_key: &[u8]) {
+//     let data_felt: Felt252 = Felt252::from_bytes_be(data.try_into().unwrap());
+//     let pubkey_felt = Felt252::from_bytes_be(public_key.try_into().unwrap());
+//     let signature_r = &signature[..32];
+//     let signature_s = &signature[32..];
+//     let signature_r_felt = Felt252::from_bytes_be(signature_r.try_into().unwrap());
+//     let signature_s_felt = Felt252::from_bytes_be(signature_s.try_into().unwrap());
     
-    let txt_data = format!("{}\n{}\n{}\n{}", 
-        data_felt.to_bigint(),
-        pubkey_felt.to_bigint(),
-        signature_r_felt.to_bigint(),
-        signature_s_felt.to_bigint()
-    );
+//     let txt_data = format!("{}\n{}\n{}\n{}", 
+//         data_felt.to_bigint(),
+//         pubkey_felt.to_bigint(),
+//         signature_r_felt.to_bigint(),
+//         signature_s_felt.to_bigint()
+//     );
 
-    std::fs::write("src/cairo/src/signature_inputs.txt", txt_data).unwrap();
-}
+//     std::fs::write("src/cairo/src/signature_inputs.txt", txt_data).unwrap();
+// }
 
 #[test]
 

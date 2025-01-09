@@ -9,7 +9,7 @@ trait X509CertificateExtractData{
     fn extract_data(self: X509CertificateIndex, der_bytes_parsed: Span<Span<u8>>) -> X509CertificateData;
 }
 
-// Define the struc
+// Define the struct
 #[derive(Debug, Drop, Copy)]
 struct X509CertificateIndex {
     pub tbs_certificate: CertificateIndex,
