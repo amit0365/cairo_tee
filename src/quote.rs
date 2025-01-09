@@ -1,5 +1,5 @@
-use starknet_types_core::felt;
-use dcap_rs::types::collaterals::IntelCollateral;
+use starknet_types_core::felt::Felt as Felt252;
+use dcap_rs::types::{collaterals::IntelCollateral, quotes::version_4::QuoteV4};
 use crate::parsed_inputs::{into_wrapper_x509_cert, ToNestedBytes, X509CertificateIndex};
 
 fn prepare_parsed_inputs(
@@ -19,22 +19,22 @@ fn prepare_parsed_inputs(
   // assert_eq!(parsed_sgx_tcb_signing_cert.as_ref(), parsed_sgx_tcb_signing_cert_extracted.as_ref());
 }
 
-// fn verify_quote_dcapv4_inputs(
-//     quote: &QuoteV4,
-//     collaterals: &IntelCollateral,
-//     current_time: u64,
-// ) { 
-//     let header = quote.header.to_bytes(); // no overflow parsing header
-//     //let raw_quote = quote.quote_body.to_bytes();
-//     let signature_len = quote.signature_len;
-//     let signature_data = &quote.signature;
-//     let (quote_signature_r, quote_signature_s) = signature_data.quote_signature.split_at(32);
-//     let quote_signature_r_felt = Felt252::from_bytes_be(quote_signature_r.try_into().unwrap());
-//     let quote_signature_s_felt = Felt252::from_bytes_be(quote_signature_s.try_into().unwrap());
+fn verify_quote_dcapv4_inputs(
+    quote: &QuoteV4,
+    collaterals: &IntelCollateral,
+    current_time: u64,
+) { 
+    let header = quote.header.to_bytes(); // no overflow parsing header
+    //let raw_quote = quote.quote_body.to_bytes();
+    let signature_len = quote.signature_len;
+    let signature_data = &quote.signature;
+    let (quote_signature_r, quote_signature_s) = signature_data.quote_signature.split_at(32);
+    let quote_signature_r_felt = Felt252::from_bytes_be(quote_signature_r.try_into().unwrap());
+    let quote_signature_s_felt = Felt252::from_bytes_be(quote_signature_s.try_into().unwrap());
 
-//     //let txt_data = format!("{:?}\n{:?}\n{:?}\n{:?}\n{:?}", header, signature_len, signature_r_felt, signature_s_felt, signature_data.quote_signature);
-//     //std::fs::write("src/cairo/src/quote_dcapv4_inputs.txt", txt_data).unwrap();
-// }
+    let txt_data = format!("{:?}\n{:?}\n{:?}\n{:?}\n{:?}", header, signature_len, quote_signature_r_felt, quote_signature_s_felt, signature_data.quote_signature);
+    std::fs::write("src/cairo/src/quote_dcapv4_inputs.txt", txt_data).unwrap();
+}
 
 // pub fn verify_p256_signature_bytes_inputs(data: &[u8], signature: &[u8], public_key: &[u8]) {
 //     let data_felt: Felt252 = Felt252::from_bytes_be(data.try_into().unwrap());

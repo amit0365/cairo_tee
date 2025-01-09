@@ -28,84 +28,84 @@ impl X509CertificateIndexImpl of X509CertificateIndices {
     }
 }
 
-impl X509CertificateExtractDataImpl of X509CertificateExtractData {
-    fn extract_data(self: X509CertificateIndex, der_bytes_parsed: Span<Span<u8>>) -> X509CertificateData {
-        let version = X509Version::from_der_parsed(
-            der_bytes_parsed[self.tbs_certificate.version.start..self.tbs_certificate.version.end].to_vec(),
-        );
+//impl X509CertificateExtractDataImpl of X509CertificateExtractData {
+    // fn extract_data(self: X509CertificateIndex, der_bytes_parsed: Span<Span<u8>>) -> X509CertificateData {
+    //     let version = X509Version::from_der_parsed(
+    //         der_bytes_parsed[self.tbs_certificate.version.start..self.tbs_certificate.version.end].to_vec(),
+    //     );
 
-        let serial = felt252::from_bytes_be(&der_bytes_parsed[self.tbs_certificate.serial.start + 2]);
-        let signature = AlgorithmIdentifier::from_der_parsed(
-            der_bytes_parsed[self.tbs_certificate.signature.start..self.tbs_certificate.signature.end].to_vec(),
-        );
+    //     let serial = felt252::from_bytes_be(&der_bytes_parsed[self.tbs_certificate.serial.start + 2]);
+    //     let signature = AlgorithmIdentifier::from_der_parsed(
+    //         der_bytes_parsed[self.tbs_certificate.signature.start..self.tbs_certificate.signature.end].to_vec(),
+    //     );
 
-        let issuer_data_owned = der_bytes_parsed[self.tbs_certificate.issuer.first().unwrap().start - 6..self.tbs_certificate.issuer.last().unwrap().end].to_vec();
-        let issuer = X509Name::from_der_parsed(issuer_data_owned);
+    //     let issuer_data_owned = der_bytes_parsed[self.tbs_certificate.issuer.first().unwrap().start - 6..self.tbs_certificate.issuer.last().unwrap().end].to_vec();
+    //     let issuer = X509Name::from_der_parsed(issuer_data_owned);
 
-        let validity = Validity::from_der_parsed(
-            extract_data(&self.tbs_certificate.validity, der_bytes_parsed),
-        );
+    //     let validity = Validity::from_der_parsed(
+    //         extract_data(&self.tbs_certificate.validity, der_bytes_parsed),
+    //     );
 
-        let subject_data_owned = der_bytes_parsed[self.tbs_certificate.subject.first().unwrap().start - 6..self.tbs_certificate.subject.last().unwrap().end].to_vec();
-        let subject = X509Name::from_der_parsed(subject_data_owned);
-        //println!("subject {:?}", subject.to_string());
+    //     let subject_data_owned = der_bytes_parsed[self.tbs_certificate.subject.first().unwrap().start - 6..self.tbs_certificate.subject.last().unwrap().end].to_vec();
+    //     let subject = X509Name::from_der_parsed(subject_data_owned);
+    //     //println!("subject {:?}", subject.to_string());
 
-        let subject_pki = SubjectPublicKeyInfo::from_der_parsed(
-            der_bytes_parsed[self.tbs_certificate.subject_pki.first().unwrap().start - 6..self.tbs_certificate.subject_pki.last().unwrap().end].to_vec(),
-        );
-        // println!("subject_pki {:?}", subject_pki);
+    //     let subject_pki = SubjectPublicKeyInfo::from_der_parsed(
+    //         der_bytes_parsed[self.tbs_certificate.subject_pki.first().unwrap().start - 6..self.tbs_certificate.subject_pki.last().unwrap().end].to_vec(),
+    //     );
+    //     // println!("subject_pki {:?}", subject_pki);
 
-        let issuer_uid = self.tbs_certificate.issuer_uid.as_ref().map(|idx| 
-            UniqueIdentifier::from_der_parsed(der_bytes_parsed[idx.start..idx.end].to_vec())
-        );
-        //println!("issuer_uid {:?}", issuer_uid);
+    //     let issuer_uid = self.tbs_certificate.issuer_uid.as_ref().map(|idx| 
+    //         UniqueIdentifier::from_der_parsed(der_bytes_parsed[idx.start..idx.end].to_vec())
+    //     );
+    //     //println!("issuer_uid {:?}", issuer_uid);
 
-        let subject_uid = self.tbs_certificate.subject_uid.as_ref().map(|idx| 
-            UniqueIdentifier::from_der_parsed(der_bytes_parsed[idx.start..idx.end].to_vec())
-        );
-        //println!("subject_uid {:?}", subject_uid);
+    //     let subject_uid = self.tbs_certificate.subject_uid.as_ref().map(|idx| 
+    //         UniqueIdentifier::from_der_parsed(der_bytes_parsed[idx.start..idx.end].to_vec())
+    //     );
+    //     //println!("subject_uid {:?}", subject_uid);
 
-        //let extensions = Vec::new();
-        let extensions = self.tbs_certificate.extensions.as_ref().map_or(Vec::new(), |idx| 
-            Vec::<X509Extension>::from_der_parsed(der_bytes_parsed[idx.start..idx.end].to_vec())
-        );
-        //println!("extensions {:?}", extensions);
-        println!("signature_algorithm after subject pki {:?}", &der_bytes_parsed[self.tbs_certificate.subject_pki.last().unwrap().end..]);
-        let tbs_cert = TbsCertificateData {
-            version,
-            serial,
-            signature,
-            issuer,
-            validity,
-            subject,
-            subject_pki,
-            issuer_uid,
-            subject_uid,
-            extensions,
-            raw: der_bytes_parsed[self.tbs_certificate.version.start..self.tbs_certificate.version.end].concat(),
-            raw_serial: der_bytes_parsed[self.tbs_certificate.serial.start..self.tbs_certificate.serial.end][0].clone(), // Owned u8
-        };
+    //     //let extensions = Vec::new();
+    //     let extensions = self.tbs_certificate.extensions.as_ref().map_or(Vec::new(), |idx| 
+    //         Vec::<X509Extension>::from_der_parsed(der_bytes_parsed[idx.start..idx.end].to_vec())
+    //     );
+    //     //println!("extensions {:?}", extensions);
+    //     println!("signature_algorithm after subject pki {:?}", &der_bytes_parsed[self.tbs_certificate.subject_pki.last().unwrap().end..]);
+    //     let tbs_cert = TbsCertificateData {
+    //         version,
+    //         serial,
+    //         signature,
+    //         issuer,
+    //         validity,
+    //         subject,
+    //         subject_pki,
+    //         issuer_uid,
+    //         subject_uid,
+    //         extensions,
+    //         raw: der_bytes_parsed[self.tbs_certificate.version.start..self.tbs_certificate.version.end].concat(),
+    //         raw_serial: der_bytes_parsed[self.tbs_certificate.serial.start..self.tbs_certificate.serial.end][0].clone(), // Owned u8
+    //     };
 
-        println!("signature_algorithm start {:?}", self.signature_algorithm.start);
-        println!("signature_algorithm end {:?}", self.signature_algorithm.end);
-        let signature_algorithm_bytes = der_bytes_parsed[self.signature_algorithm.start..self.signature_algorithm.end].to_vec();
-        println!("signature_algorithm_bytes {:?}", signature_algorithm_bytes);
-        let signature_algorithm = AlgorithmIdentifier::from_der_parsed(
-            signature_algorithm_bytes,
-        );
-        println!("signature_algorithm {:?}", signature_algorithm);
-        let sig_value_bytes = der_bytes_parsed[self.signature_value.start..self.signature_value.end].to_vec();
-        let signature_value = BitString::from_der_parsed(
-            sig_value_bytes,
-        );
-        println!("signature_value {:?}", signature_value);
-        X509CertificateData {
-            tbs_certificate_data: tbs_cert,
-            //signature_algorithm,
-            signature_value,
-        }
-    }
-}
+    //     println!("signature_algorithm start {:?}", self.signature_algorithm.start);
+    //     println!("signature_algorithm end {:?}", self.signature_algorithm.end);
+    //     let signature_algorithm_bytes = der_bytes_parsed[self.signature_algorithm.start..self.signature_algorithm.end].to_vec();
+    //     println!("signature_algorithm_bytes {:?}", signature_algorithm_bytes);
+    //     let signature_algorithm = AlgorithmIdentifier::from_der_parsed(
+    //         signature_algorithm_bytes,
+    //     );
+    //     println!("signature_algorithm {:?}", signature_algorithm);
+    //     let sig_value_bytes = der_bytes_parsed[self.signature_value.start..self.signature_value.end].to_vec();
+    //     let signature_value = BitString::from_der_parsed(
+    //         sig_value_bytes,
+    //     );
+    //     println!("signature_value {:?}", signature_value);
+    //     X509CertificateData {
+    //         tbs_certificate_data: tbs_cert,
+    //         //signature_algorithm,
+    //         signature_value,
+    //     }
+    // }
+//}
 
 // Define trait for CertificateIndex
 trait CertificateIndexTrait {
