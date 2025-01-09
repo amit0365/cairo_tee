@@ -9,10 +9,9 @@ edition = "2024_07"
 starknet = "2.9.2"
 alexandria_bytes = { git = "https://github.com/keep-starknet-strange/alexandria.git" }
 alexandria_encoding = { git = "https://github.com/keep-starknet-strange/alexandria.git" }
-
+snforge_std = "0.35.1"
 
 [dev-dependencies]
-snforge_std = "0.35.1"
 assert_macros = "2.9.2"
 
 [[target.starknet-contract]]
@@ -21,6 +20,10 @@ sierra = true
 [lib]
 sierra = true
 casm = true
+
+[tool.fmt]
+max-line-length = 120
+sort-module-level-items = true
 
 [scripts]
 test = "snforge test"

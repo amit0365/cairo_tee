@@ -1,3 +1,4 @@
+use cainome_cairo_serde::{self, CairoSerde};
 use starknet_types_core::felt::Felt as Felt252;
 use dcap_rs::types::{collaterals::IntelCollateral, quotes::version_4::QuoteV4};
 use crate::parsed_inputs::{into_wrapper_x509_cert, ToNestedBytes, X509CertificateIndex};
@@ -19,22 +20,15 @@ fn prepare_parsed_inputs(
   // assert_eq!(parsed_sgx_tcb_signing_cert.as_ref(), parsed_sgx_tcb_signing_cert_extracted.as_ref());
 }
 
-fn verify_quote_dcapv4_inputs(
-    quote: &QuoteV4,
-    collaterals: &IntelCollateral,
-    current_time: u64,
-) { 
-    let header = quote.header.to_bytes(); // no overflow parsing header
-    //let raw_quote = quote.quote_body.to_bytes();
-    let signature_len = quote.signature_len;
-    let signature_data = &quote.signature;
-    let (quote_signature_r, quote_signature_s) = signature_data.quote_signature.split_at(32);
-    let quote_signature_r_felt = Felt252::from_bytes_be(quote_signature_r.try_into().unwrap());
-    let quote_signature_s_felt = Felt252::from_bytes_be(quote_signature_s.try_into().unwrap());
+// fn serialise_collateral_inputs(
+//   collaterals: &IntelCollateral,
+// ) { 
 
-    let txt_data = format!("{:?}\n{:?}\n{:?}\n{:?}\n{:?}", header, signature_len, quote_signature_r_felt, quote_signature_s_felt, signature_data.quote_signature);
-    std::fs::write("src/cairo/src/quote_dcapv4_inputs.txt", txt_data).unwrap();
-}
+//   let collaterals_bytes = collaterals.to_bytes();
+//   let felts = Vec::<u8>::cairo_serialize(&collaterals_bytes);
+//   let txt_data = format!("{:?}", felts);
+//   std::fs::write("src/cairo/src/collateral_inputs.txt", txt_data).unwrap();
+// }
 
 // pub fn verify_p256_signature_bytes_inputs(data: &[u8], signature: &[u8], public_key: &[u8]) {
 //     let data_felt: Felt252 = Felt252::from_bytes_be(data.try_into().unwrap());
@@ -55,7 +49,6 @@ fn verify_quote_dcapv4_inputs(
 // }
 
 #[test]
-
 fn test_prepare_parsed_inputs() {
     let mut collaterals = IntelCollateral::new();
     collaterals.set_tcbinfo_bytes(include_bytes!("../data/tcbinfov3_00806f050000.json"));
@@ -68,11 +61,18 @@ fn test_prepare_parsed_inputs() {
     //println!("sgx_tcb_signing_der {:?}", collaterals.clone().sgx_tcb_signing_der.map(|b| b.len()));
 
     let collaterals_bytes = collaterals.to_bytes();
-    prepare_parsed_inputs(&collaterals_bytes);
+    //prepare_parsed_inputs(&collaterals_bytes);
+}
+
+#[test]
+fn test_serialise_collateral_inputs() {
+  let tcb_signing_cert = include_bytes!("../data/signing_cert.pem").to_vec();
+  let tcb_signing_cert_felts = Vec::<u8>::cairo_serialize(&tcb_signing_cert);
+  let txt_data = format!("{:?}", tcb_signing_cert_felts);
+  std::fs::write("src/tcb_signing_cert.txt", txt_data).unwrap();
 }
 
 // fn test_verify_p256_signature_bytes_inputs() { 
-
 //     let message_hash = "02d6479c0758efbb5aa07d35ed5454d728637fceab7ba544d3ea95403a5630a8";
 //     let message_hash_bytes = hex::decode(message_hash).unwrap();
 //     let pubkey = "01ef15c18599971b7beced415a40f0c7deacfd9b0d1819e03d723d8bc943cfca";
@@ -82,6 +82,5 @@ fn test_prepare_parsed_inputs() {
 //     let r_bytes = hex::decode(r).unwrap();
 //     let s_bytes = hex::decode(s).unwrap();
 //     let signature = [r_bytes, s_bytes].concat();
-
 //     verify_p256_signature_bytes_inputs(&message_hash_bytes, &signature, &pubkey_bytes);
 // }

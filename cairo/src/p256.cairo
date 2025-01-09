@@ -8,7 +8,7 @@ fn verify_p256_signature_felt(data: felt252, public_key: felt252, r: felt252, s:
 }
 
 #[test]
-fn test_verify_p256_signature_felt(inputs: Array<ByteArray>) {     
+fn test_verify_p256_signature_felt() {     
     let path_bytes: ByteArray = "src/signature_inputs.txt";
     let file = FileTrait::new(path_bytes);
     let inputs: Array<felt252> = read_txt(@file);
