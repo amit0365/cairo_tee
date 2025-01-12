@@ -1,7 +1,9 @@
+use serde_json::{json, Value};
 use cainome_cairo_serde::{self, CairoSerde};
 use starknet_types_core::felt::Felt as Felt252;
+use crate::parsed_inputs::FieldIndexVec;
 use dcap_rs::types::{collaterals::IntelCollateral, quotes::version_4::QuoteV4};
-use crate::parsed_inputs::{into_wrapper_x509_cert, ToNestedBytes, X509CertificateIndex};
+use crate::parsed_inputs::{into_wrapper_x509_cert, FieldIndex, ToNestedBytes, X509CertificateIndex};
 
 fn prepare_parsed_inputs(
     collaterals: &[u8],
@@ -14,21 +16,29 @@ fn prepare_parsed_inputs(
   let parsed_sgx_tcb_signing_cert = into_wrapper_x509_cert(&sgx_tcb_signing_cert);
   let (parsed_sgx_tcb_signing_cert_indices_raw, parsed_sgx_tcb_signing_cert_bytes) = parsed_sgx_tcb_signing_cert.to_der_bytes(0);
 //   println!("parsed_sgx_tcb_signing_cert_indices_raw {:?}", &parsed_sgx_tcb_signing_cert_indices_raw[28..]);
-  let parsed_sgx_tcb_signing_cert_indices = X509CertificateIndex::from_indices(parsed_sgx_tcb_signing_cert_indices_raw);
+  serialise_der_bytes_cairo_inputs(parsed_sgx_tcb_signing_cert_bytes);
+  //let parsed_sgx_tcb_signing_cert_indices = X509CertificateIndex::from_indices(parsed_sgx_tcb_signing_cert_indices_raw);
 //   println!("parsed_sgx_tcb_signing_cert_bytes len {:?}", &parsed_sgx_tcb_signing_cert_bytes.len());
-  let parsed_sgx_tcb_signing_cert_extracted = parsed_sgx_tcb_signing_cert_indices.extract_certificate(&parsed_sgx_tcb_signing_cert_bytes);
+  
+  //let parsed_sgx_tcb_signing_cert_extracted = parsed_sgx_tcb_signing_cert_indices.extract_certificate(&parsed_sgx_tcb_signing_cert_bytes);
   // assert_eq!(parsed_sgx_tcb_signing_cert.as_ref(), parsed_sgx_tcb_signing_cert_extracted.as_ref());
 }
 
-// fn serialise_collateral_inputs(
-//   collaterals: &IntelCollateral,
-// ) { 
+fn serialise_der_bytes_cairo_inputs(
+  data: Vec<Vec<u8>>,
+) {
+  let json_value: Value = json!({ "data": data });
+  let json_string = serde_json::to_string_pretty(&json_value).unwrap();
+  std::fs::write("/Users/ak36/Desktop/tee/cairo_tee/cairo/src/tcb_signing_cert.json", json_string).unwrap();
+}
 
-//   let collaterals_bytes = collaterals.to_bytes();
-//   let felts = Vec::<u8>::cairo_serialize(&collaterals_bytes);
-//   let txt_data = format!("{:?}", felts);
-//   std::fs::write("src/cairo/src/collateral_inputs.txt", txt_data).unwrap();
-// }
+fn serialise_index_cairo_inputs(
+  data: Vec<FieldIndex>,
+) {
+  let felts = Vec::<usize>::cairo_serialize(&data.to_index_vec());
+  let txt_data = format!("{:?}", felts);
+  std::fs::write("/Users/ak36/Desktop/tee/cairo_tee/cairo/src/tcb_signing_cert_indices.txt", txt_data).unwrap();
+}
 
 // pub fn verify_p256_signature_bytes_inputs(data: &[u8], signature: &[u8], public_key: &[u8]) {
 //     let data_felt: Felt252 = Felt252::from_bytes_be(data.try_into().unwrap());
@@ -58,18 +68,19 @@ fn test_prepare_parsed_inputs() {
     collaterals.set_sgx_intel_root_ca_crl_der(include_bytes!("../data/intel_root_ca_crl.der"));
     collaterals.set_sgx_platform_crl_der(include_bytes!("../data/pck_platform_crl.der"));
     collaterals.set_sgx_processor_crl_der(include_bytes!("../data/pck_processor_crl.der"));
-    //println!("sgx_tcb_signing_der {:?}", collaterals.clone().sgx_tcb_signing_der.map(|b| b.len()));
 
     let collaterals_bytes = collaterals.to_bytes();
-    //prepare_parsed_inputs(&collaterals_bytes);
+    prepare_parsed_inputs(&collaterals_bytes);
 }
 
 #[test]
 fn test_serialise_collateral_inputs() {
   let tcb_signing_cert = include_bytes!("../data/signing_cert.pem").to_vec();
-  let tcb_signing_cert_felts = Vec::<u8>::cairo_serialize(&tcb_signing_cert);
-  let txt_data = format!("{:?}", tcb_signing_cert_felts);
-  std::fs::write("src/tcb_signing_cert.txt", txt_data).unwrap();
+  // let tcb_signing_cert_felts = Vec::<u8>::cairo_serialize(&tcb_signing_cert);
+  // let inputs = serde_json::to_vec(&tcb_signing_cert_felts).unwrap();
+  // let txt_data = format!("{:?}", tcb_signing_cert_felts);
+
+  //std::fs::write("/Users/ak36/Desktop/tee/cairo_tee/cairo/src/tcb_signing_cert.json", inputs).unwrap();
 }
 
 // fn test_verify_p256_signature_bytes_inputs() { 

@@ -18,6 +18,16 @@ pub struct FieldIndex {
     pub end: usize,
 }
 
+pub trait FieldIndexVec {
+    fn to_index_vec(&self) -> Vec<usize>;
+}
+
+impl FieldIndexVec for Vec<FieldIndex> {
+    fn to_index_vec(&self) -> Vec<usize> {
+        self.iter().map(|index| index.start).collect()
+    }
+}
+
 #[derive(Debug)]
 pub struct CertificateIndex {
     pub version: FieldIndex,

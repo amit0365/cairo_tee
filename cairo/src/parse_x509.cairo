@@ -1,4 +1,5 @@
 use core::traits::Into;
+use snforge_std::fs::{FileTrait, read_txt, FileParser};
 
 // Define the trai
 trait X509CertificateIndices {
@@ -18,15 +19,15 @@ struct X509CertificateIndex {
 }
 
 // Implement the trait
-// impl X509CertificateIndexImpl of X509CertificateIndices {
-//     fn from_indices(indices: Span<FieldIndex>) -> X509CertificateIndex {
-//         X509CertificateIndex {
-//             tbs_certificate: CertificateIndexTrait::from_indices(indices),
-//             signature_algorithm: indices[0],
-//             signature_value: indices[1],
-//         }
-//     }
-// }
+impl X509CertificateIndexImpl of X509CertificateIndices {
+    fn from_indices(indices: Span<FieldIndex>) -> X509CertificateIndex {
+        X509CertificateIndex {
+            tbs_certificate: CertificateIndexTrait::from_indices(indices),
+            signature_algorithm: indices[0],
+            signature_value: indices[1],
+        }
+    }
+}
 
 // impl X509CertificateExtractDataImpl of X509CertificateExtractData {
 //     fn extract_data(self: X509CertificateIndex, der_bytes_parsed: Span<Span<u8>>) -> X509CertificateData {
@@ -183,31 +184,12 @@ pub struct TbsCertificateData {
     pub raw_serial: Span<u8>,
 }
 
-use core::ecdsa::check_ecdsa_signature;
-use starknet::secp256_trait::Signature;
-use alexandria_encoding::base64;
-use snforge_std::fs::{FileTrait, read_txt};
 
-fn verify_p256_signature_felt(data: felt252, public_key: felt252, r: felt252, s: felt252) -> bool {
-    check_ecdsa_signature(data, public_key, r, s)
+
+pub fn main(inputs: Array<Array<u8>>) {     
+    let der_bytes_parsed = inputs.span();
+    println!("der_bytes_parsed {:?}", der_bytes_parsed[9]);
+    // let x509_certificate_index = X509CertificateIndex::from_indices(der_bytes_parsed);
+    // let x509_certificate_data = x509_certificate_index.extract_data(der_bytes_parsed);
+    // println!("x509_certificate_data {:?}", x509_certificate_data);
 }
-
-// #[test]
-// fn test_extract_certificate_data(inputs: Array<ByteArray>) {     
-//     let path_bytes: ByteArray = "src/signature_inputs.txt";
-//     let file = FileTrait::new(path_bytes);
-//     let inputs: Array<felt252> = read_txt(@file);
-
-//     let mut x: Array<ByteArray> = ArrayTrait::new();
-//     let x_bytes: ByteArray = "src/signature_inputs.txt";
-//     x.append(x_bytes);
-//     //let y: ByteArray = x.span().slice(1, 2);
-
-//     let message_hash = *inputs.at(0);
-//     let pubkey = *inputs.at(1);
-//     let r = *inputs.at(2);
-//     let s = *inputs.at(3);
-
-//     let result = verify_p256_signature_felt(message_hash.clone(), pubkey.clone(), r.clone(), s.clone());
-//     assert(result, 'Signature verification failed');
-// }
