@@ -127,6 +127,7 @@ impl QuoteV4Impl of QuoteV4FromBytes {
         }
     }
 }
+
 //     pub fn get_cert_data(&self) -> CertDataType {
 //         match self.cert_data_type {
 //             1 => CertDataType::Type1(self.cert_data.clone()),
