@@ -1,5 +1,4 @@
-mod body;
-
+use crate::types::quote::body::QuoteBody;
 use alexandria_bytes::BytesTrait;
 use core::traits::TryInto;
 use cairo::utils::byte::{u32s_to_u8s, SpanU8TryIntoArrayU8Fixed2, SpanU8TryIntoArrayU8Fixed4,
@@ -12,7 +11,7 @@ trait QuoteHeaderFromBytes {
     fn from_bytes(raw_bytes: Span<felt252>) -> QuoteHeader;
 }
 
-#[derive(Clone, Drop)]
+#[derive(Drop, Copy)]
 pub struct QuoteHeader {
     pub version: u16,                   // [2 bytes]
                                         // Version of the quote data structure - 4, 5
@@ -60,3 +59,4 @@ impl QuoteHeaderImpl of QuoteHeaderFromBytes {
         }
     }
 }
+

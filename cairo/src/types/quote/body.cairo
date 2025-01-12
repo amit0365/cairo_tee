@@ -156,8 +156,8 @@ impl EnclaveReportImpl of EnclaveReportFromBytes {
         let reserved_2: [u8; 32] = u32s_to_u8s(raw_bytes.slice(96, 32)).try_into().unwrap();
         let mrsigner: [u8; 32] = u32s_to_u8s(raw_bytes.slice(128, 32)).try_into().unwrap();
         let reserved_3: [u8; 96] = u32s_to_u8s(raw_bytes.slice(160, 96)).try_into().unwrap();
-        let isv_prod_id: u16 = (*raw_bytes[256].into() + (*raw_bytes[257] * 256_felt252).into()).try_into().unwrap();
-        let isv_svn: u16 = (*raw_bytes[258].into() + (*raw_bytes[259] * 256_felt252).into()).try_into().unwrap();
+        let isv_prod_id: u16 = felt252s_to_u16(raw_bytes.slice(256, 2));
+        let isv_svn: u16 = felt252s_to_u16(raw_bytes.slice(258, 2));
         let reserved_4: [u8; 60] = u32s_to_u8s(raw_bytes.slice(260, 60)).try_into().unwrap();
         let report_data: [u8; 64] = u32s_to_u8s(raw_bytes.slice(320, 64)).try_into().unwrap();
 
@@ -180,26 +180,3 @@ impl EnclaveReportImpl of EnclaveReportFromBytes {
 }
 
 
-// #[derive(Clone, Debug)]
-// pub struct QuoteV4 {
-//     pub header: QuoteHeader,            // [48 bytes]
-//                                         // Header of Quote data structure.
-//                                         // This field is transparent (the user knows its internal structure).
-//                                         // Rest of the Quote data structure can be treated as opaque (hidden from the user).
-//     pub quote_body: QuoteBody,          // May either contain a SGX Enclave Report (384 bytes) or TD10 Report (584 bytes)
-//     pub signature_len: u32,             // [4 bytes]
-//                                         // Size of the Quote Signature Data structure in bytes.
-//     pub signature: QuoteSignatureDataV4,             // [variable bytes]
-// }
-
-// pub fn verify_quote_dcapv4(
-//     quote: &QuoteV4,
-//     collaterals: &IntelCollateral,
-//     current_time: u64,
-// ) -> VerifiedOutput {
-//     let quote_data = quote.data;
-//     let quote_signature = quote.signature;
-//     let quote_signer = quote.signer;
-//     let quote_measurement = quote.measurement;
-//     let quote_attributes = quote.attributes;
-// }
