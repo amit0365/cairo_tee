@@ -1,4 +1,4 @@
-TEE Remote Attestation Verification in Cairo. 
+TEE Remote Attestation Verification in Cairo - Idea credit and helpful resources from Tarrence from Cartridge.
 
 ## Short Introduction to TEE's and Remote Attestations (WIP)
 
