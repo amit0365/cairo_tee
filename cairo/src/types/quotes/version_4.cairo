@@ -1,8 +1,8 @@
-use cairo::types::quote::header::QuoteHeader;
-use cairo::types::quote::body::QuoteBody;
-use cairo::types::quote::header::QuoteHeaderImpl;
-use cairo::types::quote::body::{EnclaveReportImpl, EnclaveReport};
-use cairo::types::quote::body::TD10ReportBodyImpl;
+use cairo::types::quotes::header::QuoteHeader;
+use cairo::types::quotes::body::QuoteBody;
+use cairo::types::quotes::header::QuoteHeaderImpl;
+use cairo::types::quotes::body::{EnclaveReportImpl, EnclaveReport};
+use cairo::types::quotes::body::TD10ReportBodyImpl;
 use cairo::types::cert::Certificates;
 use cairo::constants::{ENCLAVE_REPORT_LEN, SGX_TEE_TYPE, TD10_REPORT_LEN, TDX_TEE_TYPE};
 

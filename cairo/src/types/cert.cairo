@@ -1,4 +1,4 @@
-// use serde::{Serialize, Deserialize};
+use starknet::secp256_trait::Signature;
 // use x509_parser::{certificate::X509Certificate, revocation_list::CertificateRevocationList};
 
 // use crate::utils::cert::{get_crl_uri, is_cert_revoked, parse_x509_der_multi, pem_to_der};
@@ -142,3 +142,34 @@ impl CertificatesFromBytesImpl of CertificatesFromBytes {
 //     }
 //     der_bytes
 // }
+
+pub struct X509CertificateData {
+    pub tbs_certificate_data: TbsCertificateData,
+    //pub signature_algorithm: Span<Span<u8>>, not needed
+    pub signature_value: Signature,
+}
+
+
+pub struct PublicKey{
+    pub x: u256,
+    pub y: u256,
+}
+
+pub struct X509NameRaw{
+    pub raw: Span<u8>,
+}
+
+pub struct TbsCertificateData {
+    pub version: u8,
+    pub serial: felt252, //biguint
+    pub signature: Signature,
+    pub issuer: X509NameRaw,
+    pub validity: Span<Span<u8>>,
+    pub subject: X509NameRaw,
+    pub subject_pki: PublicKey,
+    pub issuer_uid: Option<Span<Span<u8>>>,
+    pub subject_uid: Option<Span<Span<u8>>>,
+    pub extensions: Option<Span<Span<u8>>>,
+    pub raw: Span<u8>,
+    pub raw_serial: Span<u8>,
+}

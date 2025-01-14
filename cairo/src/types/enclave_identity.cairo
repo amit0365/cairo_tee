@@ -1,3 +1,5 @@
+use core::starknet::secp256_trait::Signature;
+
 // EnclaveIdentityV2:
 //     type: object
 //     description: SGX Enclave Identity data structure encoded as JSON string in case of success
@@ -132,7 +134,7 @@
 #[derive(Debug, Clone, PartialEq)]
 pub struct EnclaveIdentityV2 {
     pub enclave_identity: EnclaveIdentityV2Inner,
-    pub signature: felt252,
+    pub signature: Signature,
 }
 
 #[derive(Debug, Clone, PartialEq, Drop)]
@@ -155,7 +157,7 @@ pub struct EnclaveIdentityV2Inner {
 pub struct EnclaveIdentityV2TcbLevelItem {
     pub tcb: EnclaveIdentityV2TcbLevel,
     pub tcb_date: felt252,
-    pub tcb_status: felt252,
+    pub tcb_status: ByteArray,
     // #[serde(rename(serialize = "advisoryIDs", deserialize = "advisoryIDs"))]
     // #[serde(skip_serializing_if = "Option::is_none")]
     pub advisory_ids: Option<Span<felt252>>,

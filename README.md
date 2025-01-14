@@ -1,4 +1,4 @@
-TEE Remote Attestation Verification in Cairo
+TEE Remote Attestation Verification in Cairo. 
 
 ## Short Introduction to TEE's and Remote Attestations (WIP)
 
@@ -21,7 +21,7 @@ Use cases:
 - Process-level or application-level isolation (enclaves).
 - Typically uses frameworks like Gramine (formerly Graphene), SCONE, Occlum, etc. to port standard applications into an enclave. This includes singing a hash of the binary. The developer provides a manifest file which contains the files and dependencies to be mounted into the enclave[1]. The network calls are executed outside the enclave, but the encrypted data is returned and decrypted inside the enclave.
 
- reference: [Gramine](https://github.com/gramineproject/gramine/blob/master/CI-Examples/redis/redis-server.manifest.template)
+reference: [Gramine](https://github.com/gramineproject/gramine/blob/master/CI-Examples/redis/redis-server.manifest.template)
 
 #### Intel® TDX (Trust Domain Extensions)
 

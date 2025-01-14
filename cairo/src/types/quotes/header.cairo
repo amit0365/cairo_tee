@@ -1,4 +1,4 @@
-use crate::types::quote::body::QuoteBody;
+use crate::types::quotes::body::QuoteBody;
 use alexandria_bytes::BytesTrait;
 use core::traits::TryInto;
 use cairo::utils::byte::{u32s_to_u8s, SpanU8TryIntoArrayU8Fixed2, SpanU8TryIntoArrayU8Fixed4,

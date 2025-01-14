@@ -276,6 +276,15 @@ fn u8s_to_u32s_pad_end(mut bytes: Span<u8>) -> Array<u32> {
     output
 }
 
+fn u8s_to_felt252s(mut bytes: Span<u8>) -> Array<felt252> {
+    let mut output = array![];
+    for i in 0..bytes.len() {
+        let bytes: felt252 = (*bytes[i]).try_into().unwrap();
+        output.append(bytes);
+    };
+    output
+}
+
 impl SpanU8TryIntoArrayU8Fixed2 of TryInto<Span<u8>, [u8; 2]> {
     fn try_into(self: Span<u8>) -> Option<[u8; 2]> {
         if self.len() == 2 {

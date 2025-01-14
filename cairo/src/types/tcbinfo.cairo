@@ -1,4 +1,4 @@
-//use serde::{Deserialize, Serialize};
+use core::starknet::secp256_trait::Signature;
 
 pub enum TcbInfo {
     V2: TcbInfoV2,
@@ -240,11 +240,10 @@ pub enum TcbInfo {
 // #[serde(rename_all = "camelCase")]
 pub struct TcbInfoV2 {
     pub tcb_info: TcbInfoV2Inner,
-    pub signature: felt252,
+    pub signature: Signature,
 }
 
-// #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-// #[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Serde)]
 pub struct TcbInfoV2Inner {
     pub version: u32,
     pub issue_date: felt252,
@@ -256,16 +255,14 @@ pub struct TcbInfoV2Inner {
     pub tcb_levels: Span<TcbInfoV2TcbLevelItem>,
 }
 
-// #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-// #[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Serde, Drop)]
 pub struct TcbInfoV2TcbLevelItem {
     pub tcb: TcbInfoV2TcbLevel,
     pub tcb_date: felt252,
     pub tcb_status: felt252,
 }
 
-// #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-// #[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Serde, Drop)]
 pub struct TcbInfoV2TcbLevel {
     pub sgxtcbcomp01svn: u8,
     pub sgxtcbcomp02svn: u8,
@@ -562,15 +559,13 @@ pub struct TcbInfoV2TcbLevel {
 //                 i.e:
 //                 {"version":2,"issueDate":"2019-07-30T12:00:00Z","nextUpdate":"2019-08-30T12:00:00Z",...}
 
-// #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-// #[serde(rename_all = "camelCase")]
+#[derive(Debug, Copy, PartialEq, Serde, Drop)]
 pub struct TcbInfoV3 {
     pub tcb_info: TcbInfoV3Inner,
-    pub signature: felt252,
+    pub signature: Signature,
 }
 
-// #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-// #[serde(rename_all = "camelCase")]
+#[derive(Debug, Copy, PartialEq, Serde, Drop)]
 pub struct TcbInfoV3Inner {
     pub id: felt252,
     pub version: u32,
@@ -587,42 +582,41 @@ pub struct TcbInfoV3Inner {
     pub tcb_levels: Span<TcbInfoV3TcbLevelItem>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serde)]
-//#[serde(rename_all = "camelCase")]
-pub struct TdxModule {
-    pub mrsigner: felt252,                   // Base 16-encoded string representation of the measurement of a TDX SEAM module’s signer.
-    pub attributes: felt252,                 // Hex-encoded byte array (8 bytes) representing attributes "golden" value.
-    pub attributes_mask: felt252,            // Hex-encoded byte array (8 bytes) representing mask to be applied to TDX SEAM module’s
+#[derive(Debug, Copy, PartialEq, Serde, Drop)]
+pub struct TdxModule {  
+    pub mrsigner: Span<u8>,                   // Base 16-encoded string representation of the measurement of a TDX SEAM module’s signer.
+    pub attributes: [u8; 8],                 // Hex-encoded byte array (8 bytes) representing attributes "golden" value.
+    pub attributes_mask: [u8; 8],            // Hex-encoded byte array (8 bytes) representing mask to be applied to TDX SEAM module’s
                                             // attributes value retrieved from the platform
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Copy, PartialEq, Serde, Drop)]
 pub struct TdxModuleIdentities {
-    pub id: felt252,                         // Identifier of TDX Module
-    pub mrsigner: felt252,                   // Base 16-encoded string representation of the measurement of a TDX SEAM module’s signer.
-    pub attributes: felt252,                 // Base 16-encoded string representation of the byte array (8 bytes) representing attributes "golden" value.
-    pub attributes_mask: felt252,            // Base 16-encoded string representation of the byte array (8 bytes) representing mask to be applied to TDX SEAM module’s
+    pub id: u8,                         // Identifier of TDX Module
+    pub mrsigner: Span<u8>,                  // Base 16-encoded string representation of the measurement of a TDX SEAM module’s signer.
+    pub attributes: [u8; 8],                 // Base 16-encoded string representation of the byte array (8 bytes) representing attributes "golden" value.
+    pub attributes_mask: [u8; 8],            // Base 16-encoded string representation of the byte array (8 bytes) representing mask to be applied to TDX SEAM module’s
                                             // attributes value retrieved from the platform
     pub tcb_levels: Span<TdxModuleIdentitiesTcbLevelItem>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serde, Drop)]
 pub struct TdxModuleIdentitiesTcbLevelItem {
     pub tcb: TdxModuleIdentitiesTcbLevel,
     pub tcb_date: felt252,
-    pub tcb_status: felt252,
+    pub tcb_status: ByteArray, //todo string can exceed felt252 size - long string
     // #[serde(rename(serialize = "advisoryIDs", deserialize = "advisoryIDs"))]
     // #[serde(skip_serializing_if = "Option::is_none")]
     pub advisory_ids: Option<Span<felt252>>,
 
 }
 
-#[derive(Default, Debug, Clone, Drop, PartialEq, Serde)]
+#[derive(Default, Debug, Copy, Drop, PartialEq, Serde)]
 pub struct TdxModuleIdentitiesTcbLevel {
     pub isvsvn: u8,                        // TDX SEAM module’s ISV SVN
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serde, Drop)]
 pub struct TcbInfoV3TcbLevelItem {
     pub tcb: TcbInfoV3TcbLevel,
     pub tcb_date: felt252,
@@ -632,7 +626,7 @@ pub struct TcbInfoV3TcbLevelItem {
     pub advisory_ids: Option<Span<felt252>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Drop)]
+#[derive(Debug, Clone, PartialEq, Serde, Drop)]
 pub struct TcbInfoV3TcbLevel {
     pub sgxtcbcomponents: Span<TcbComponent>,
     pub pcesvn: u16,
@@ -640,7 +634,7 @@ pub struct TcbInfoV3TcbLevel {
     pub tdxtcbcomponents: Option<Span<TcbComponent>>,
 }
 
-#[derive(Default,Debug, Clone, PartialEq, Serde)]
+#[derive(Default,Debug, Clone, PartialEq, Serde, Drop)]
 pub struct TcbComponent {
     pub svn: u8,                                                   // SVN of TCB Component.
     // #[serde(skip_serializing_if = "Option::is_none")]
