@@ -46,7 +46,7 @@ pub fn validate_tcbinfov3(tcbinfov3: @TcbInfoV3, sgx_signing_cert: @X509Certific
     //     return false;
     // }
 
-    // // verify that the tcb_info_root is signed by the root cert
+    // verify that the tcb_info_root is signed by the root cert
     let mut tcbinfov3_signature_data = array![];
     Serde::serialize(tcbinfov3.tcb_info, ref tcbinfov3_signature_data);
     let (public_key_x, public_key_y) = (sgx_signing_cert.tbs_certificate_data.subject_pki.x, sgx_signing_cert.tbs_certificate_data.subject_pki.y);

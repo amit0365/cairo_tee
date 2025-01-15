@@ -229,6 +229,45 @@ fn u32s_typed_to_u256(arr: @[u32; 8]) -> u256 {
     u32s_to_u256(arr.span())
 }
 
+fn u8s_typed_to_u256(arr: @[u8; 32]) -> u256 {
+    let [arr0, arr1, arr2, arr3, arr4, arr5, arr6, arr7, arr8, arr9, arr10, arr11, arr12, arr13, arr14, arr15, arr16, arr17, arr18, arr19, arr20, arr21, arr22, arr23, arr24, arr25, arr26, arr27, arr28, arr29, arr30, arr31] = arr;
+    let arr: Array<felt252> = array![
+        (*arr0).into(),
+        (*arr1).into(),
+        (*arr2).into(),
+        (*arr3).into(),
+        (*arr4).into(),
+        (*arr5).into(),
+        (*arr6).into(),
+        (*arr7).into(),
+        (*arr8).into(),
+        (*arr9).into(),
+        (*arr10).into(),
+        (*arr11).into(),
+        (*arr12).into(),
+        (*arr13).into(),
+        (*arr14).into(),
+        (*arr15).into(),
+        (*arr16).into(),
+        (*arr17).into(),
+        (*arr18).into(),
+        (*arr19).into(),
+        (*arr20).into(),
+        (*arr21).into(),
+        (*arr22).into(),
+        (*arr23).into(),
+        (*arr24).into(),
+        (*arr25).into(),
+        (*arr26).into(),
+        (*arr27).into(),
+        (*arr28).into(),
+        (*arr29).into(),
+        (*arr30).into(),
+        (*arr31).into(),
+    ];
+    u32s_to_u256(arr.span())
+}
+
 // Accepts felt252 for efficiency as it's the type of retdata but all values are expected to fit u32
 fn u32s_to_u8s(mut words: Span<felt252>) -> Span<u8> {
     let mut output = array![];

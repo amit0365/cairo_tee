@@ -1,8 +1,8 @@
-mod quotes;
-mod cert;
-mod tcbinfo;
-mod collaterals;
-mod enclave_identity;
+pub mod quotes;
+pub mod cert;
+pub mod tcbinfo;
+pub mod collaterals;
+pub mod enclave_identity;
 use crate::types::quotes::body::QuoteBody;
 use crate::constants::{ENCLAVE_REPORT_LEN, SGX_TEE_TYPE, TD10_REPORT_LEN, TDX_TEE_TYPE};
 // use alloy_sol_types::SolValue;

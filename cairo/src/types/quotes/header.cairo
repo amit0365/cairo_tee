@@ -1,17 +1,20 @@
 use crate::types::quotes::body::QuoteBody;
 use alexandria_bytes::BytesTrait;
 use core::traits::TryInto;
-use cairo::utils::byte::{u32s_to_u8s, SpanU8TryIntoArrayU8Fixed2, SpanU8TryIntoArrayU8Fixed4,
+use cairo::utils::{
+    byte::{u32s_to_u8s, SpanU8TryIntoArrayU8Fixed2, SpanU8TryIntoArrayU8Fixed4,
     SpanU8TryIntoArrayU8Fixed96, SpanU8TryIntoArrayU8Fixed20, SpanU8TryIntoArrayU8Fixed28, 
     SpanU8TryIntoArrayU8Fixed16, SpanU8TryIntoArrayU8Fixed32, SpanU8TryIntoArrayU8Fixed64, 
-    SpanU8TryIntoArrayU8Fixed60, SpanU8TryIntoArrayU8Fixed48, felt252s_to_u32, felt252s_to_u16, felt252s_to_u64};
+    SpanU8TryIntoArrayU8Fixed60, SpanU8TryIntoArrayU8Fixed48, felt252s_to_u32, felt252s_to_u16, felt252s_to_u64},
+    compare::{PartialEqU8Array16, PartialEqU8Array20},
+};
 
 
 trait QuoteHeaderFromBytes {
     fn from_bytes(raw_bytes: Span<felt252>) -> QuoteHeader;
 }
 
-#[derive(Drop, Copy)]
+#[derive(Drop, Copy, PartialEq)]
 pub struct QuoteHeader {
     pub version: u16,                   // [2 bytes]
                                         // Version of the quote data structure - 4, 5
@@ -60,3 +63,17 @@ impl QuoteHeaderImpl of QuoteHeaderFromBytes {
     }
 }
 
+// #[generate_trait]
+// impl QuoteHeaderToBytesImpl of QuoteHeaderToBytes {
+//     fn to_bytes(self: @QuoteHeader) -> Span<u8> {
+//         let mut data = array![];
+//         data.append_span(self.version.to_bytes());
+//         data.append_span(self.att_key_type.to_bytes());
+//         data.append_span(self.tee_type.to_bytes());
+//         data.append_span(self.qe_svn.span());
+//         data.append_span(self.pce_svn.span());
+//         data.append_span(self.qe_vendor_id.span());
+//         data.append_span(self.user_data.span());
+//         data.span()
+//     }
+// }

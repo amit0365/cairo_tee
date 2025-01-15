@@ -131,7 +131,7 @@ use core::starknet::secp256_trait::Signature;
 //             description: Hex-encoded string representation of a signature calculated
 //                 over qeIdentity body (without whitespaces) using TCB Info Signing Key.
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Drop)]
 pub struct EnclaveIdentityV2 {
     pub enclave_identity: EnclaveIdentityV2Inner,
     pub signature: Signature,

@@ -1,57 +1,99 @@
 use starknet::secp256_trait::Signature;
 // use x509_parser::{certificate::X509Certificate, revocation_list::CertificateRevocationList};
-
 // use crate::utils::cert::{get_crl_uri, is_cert_revoked, parse_x509_der_multi, pem_to_der};
-
-// use super::collaterals::IntelCollateral;
+use super::collaterals::IntelCollateralData;
 
 // #[derive(Default, Debug)]
-// #[serde(rename_all = "camelCase")]
-// pub struct SgxExtensionTcbLevel {
-//     pub sgxtcbcomp01svn: u8,
-//     pub sgxtcbcomp02svn: u8,
-//     pub sgxtcbcomp03svn: u8,
-//     pub sgxtcbcomp04svn: u8,
-//     pub sgxtcbcomp05svn: u8,
-//     pub sgxtcbcomp06svn: u8,
-//     pub sgxtcbcomp07svn: u8,
-//     pub sgxtcbcomp08svn: u8,
-//     pub sgxtcbcomp09svn: u8,
-//     pub sgxtcbcomp10svn: u8,
-//     pub sgxtcbcomp11svn: u8,
-//     pub sgxtcbcomp12svn: u8,
-//     pub sgxtcbcomp13svn: u8,
-//     pub sgxtcbcomp14svn: u8,
-//     pub sgxtcbcomp15svn: u8,
-//     pub sgxtcbcomp16svn: u8,
-//     pub pcesvn: u16,
-//     pub cpusvn: [u8; 16]
-// }
+pub struct SgxExtensionTcbLevel {
+    pub sgxtcbcomp01svn: u8,
+    pub sgxtcbcomp02svn: u8,
+    pub sgxtcbcomp03svn: u8,
+    pub sgxtcbcomp04svn: u8,
+    pub sgxtcbcomp05svn: u8,
+    pub sgxtcbcomp06svn: u8,
+    pub sgxtcbcomp07svn: u8,
+    pub sgxtcbcomp08svn: u8,
+    pub sgxtcbcomp09svn: u8,
+    pub sgxtcbcomp10svn: u8,
+    pub sgxtcbcomp11svn: u8,
+    pub sgxtcbcomp12svn: u8,
+    pub sgxtcbcomp13svn: u8,
+    pub sgxtcbcomp14svn: u8,
+    pub sgxtcbcomp15svn: u8,
+    pub sgxtcbcomp16svn: u8,
+    pub pcesvn: u16,
+    pub cpusvn: [u8; 16]
+}
 
 
 // #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-// pub struct SgxExtensions {
-//     pub ppid: [u8; 16],
-//     pub tcb: SgxExtensionTcbLevel,
-//     pub pceid: [u8; 2],
-//     pub fmspc: [u8; 6],
-//     pub sgx_type: u32,
-//     pub platform_instance_id: Option<[u8; 16]>,
-//     pub configuration: Option<PckPlatformConfiguration>,
-// }
+pub struct SgxExtensions {
+    pub ppid: [u8; 16],
+    pub tcb: SgxExtensionTcbLevel,
+    pub pceid: [u8; 2],
+    pub fmspc: [u8; 6],
+    pub sgx_type: u32,
+    pub platform_instance_id: Option<[u8; 16]>,
+    pub configuration: Option<PckPlatformConfiguration>,
+}
 
-// #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-// pub struct PckPlatformConfiguration {
-//     pub dynamic_platform: Option<bool>,
-//     pub cached_keys: Option<bool>,
-//     pub smt_enabled: Option<bool>,
-// }
+//#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PckPlatformConfiguration {
+    pub dynamic_platform: Option<bool>,
+    pub cached_keys: Option<bool>,
+    pub smt_enabled: Option<bool>,
+}
 
-// #[derive(Debug)]
-// pub struct IntelSgxCrls<'a> {
-//     pub sgx_root_ca_crl: Option<CertificateRevocationList<'a>>,
-//     pub sgx_pck_processor_crl: Option<CertificateRevocationList<'a>>,
-//     pub sgx_pck_platform_crl: Option<CertificateRevocationList<'a>>,
+#[derive(Drop)]
+pub struct CertificateRevocationList {
+    pub tbs_cert_list: TbsCertificateDataList,
+    // pub signature_algorithm: AlgorithmIdentifier,
+    pub signature_value: Signature,
+}
+
+#[derive(Drop)]
+pub struct IntelSgxCrls {
+    pub sgx_root_ca_crl: @Option<CertificateRevocationList>,
+    pub sgx_pck_processor_crl: @Option<CertificateRevocationList>,
+    pub sgx_pck_platform_crl: @Option<CertificateRevocationList>,
+}
+
+#[generate_trait]
+impl IntelSgxCrlsImpl of IntelSgxCrlsTrait {
+    fn from_collaterals(collaterals: @IntelCollateralData) -> IntelSgxCrls {
+        IntelSgxCrls {
+            sgx_root_ca_crl: collaterals.sgx_intel_root_ca_crl,
+            sgx_pck_processor_crl: collaterals.sgx_pck_processor_crl,
+            sgx_pck_platform_crl: collaterals.sgx_pck_platform_crl,
+        }
+    }
+}
+
+// #[generate_trait]
+// impl IntelSgxCrlsRevokedImpl of IntelSgxCrlsRevokedTrait {
+//     fn is_cert_revoked(cert: @X509CertificateData, crl: @CertificateRevocationList) -> bool {
+//         let crl = match get_crl_uri(cert) {
+//             Some(crl_uri) => {
+//                 if crl_uri.contains("https://api.trustedservices.intel.com/sgx/certification/v3/pckcrl?ca=platform")
+//                     || crl_uri.contains("https://api.trustedservices.intel.com/sgx/certification/v4/pckcrl?ca=platform") {
+//                     self.sgx_pck_platform_crl.as_ref()
+//                 } else if crl_uri.contains("https://api.trustedservices.intel.com/sgx/certification/v3/pckcrl?ca=processor")
+//                     || crl_uri.contains("https://api.trustedservices.intel.com/sgx/certification/v4/pckcrl?ca=processor") {
+//                     self.sgx_pck_processor_crl.as_ref()
+//                 } else if crl_uri.contains("https://certificates.trustedservices.intel.com/IntelSGXRootCA.der") {
+//                     self.sgx_root_ca_crl.as_ref()
+//                 } else {
+//                     panic!("Unknown CRL URI: {}", crl_uri);
+//                 }
+//             },
+//             None => {
+//                 panic!("No CRL URI found in certificate");
+//             }
+//         }.unwrap();
+
+//         // check if the cert is revoked given the crl
+//         is_cert_revoked(cert, crl)
+//     }
 // }
 
 // impl<'a> IntelSgxCrls<'a> {
@@ -143,6 +185,7 @@ impl CertificatesFromBytesImpl of CertificatesFromBytes {
 //     der_bytes
 // }
 
+#[derive(PartialEq, Drop)]
 pub struct X509CertificateData {
     pub tbs_certificate_data: TbsCertificateData,
     //pub signature_algorithm: Span<Span<u8>>, not needed
@@ -150,18 +193,21 @@ pub struct X509CertificateData {
 }
 
 
+#[derive(PartialEq, Drop)]
 pub struct PublicKey{
     pub x: u256,
     pub y: u256,
 }
 
+#[derive(PartialEq, Drop)]
 pub struct X509NameRaw{
     pub raw: Span<u8>,
 }
 
+#[derive(PartialEq, Drop)]
 pub struct TbsCertificateData {
     pub version: u8,
-    pub serial: felt252, //biguint
+    pub serial: felt252, //todo check this, should bebiguint
     pub signature: Signature,
     pub issuer: X509NameRaw,
     pub validity: Span<Span<u8>>,
@@ -170,6 +216,48 @@ pub struct TbsCertificateData {
     pub issuer_uid: Option<Span<Span<u8>>>,
     pub subject_uid: Option<Span<Span<u8>>>,
     pub extensions: Option<Span<Span<u8>>>,
-    pub raw: Span<u8>,
-    pub raw_serial: Span<u8>,
+    pub (crate) raw: Span<u8>,
+    pub (crate) raw_serial: Span<u8>,
+}
+
+// pub fn signature_to_span(signature: Signature) -> Span<u8> {
+//     let mut signature_span = array![];
+//     signature_span.append_span(signature.r.as_slice().try_into().unwrap());
+//     signature_span.append_span(signature.s.as_slice().try_into().unwrap());
+//     signature_span.span()
+// }
+
+#[generate_trait]
+impl TbsCertificateDataImpl of TbsCertificateDataTrait {
+    fn as_ref(self: @TbsCertificateData) -> Span<u8> {
+        self.raw.deref()
+    }
+}
+
+#[derive(Drop)]
+pub struct TbsCertificateDataList {
+    pub version: Option<u8>,
+    pub signature: Signature,
+    pub issuer: X509NameRaw,
+    pub this_update: felt252, //ASN1Time using felt for now
+    pub next_update: Option<felt252>, //ASN1Time using felt for now
+    pub revoked_certificates: Span<RevokedCertificate>,
+    pub extensions: Option<Span<Span<u8>>>,
+    pub (crate) raw: Span<u8>,
+}
+
+#[generate_trait]
+impl TbsCertificateDataListImpl of TbsCertificateDataListTrait {
+    fn as_ref(self: @TbsCertificateDataList) -> Span<u8> {
+        self.raw.deref()
+    }
+}
+
+pub struct RevokedCertificate {
+    /// The Serial number of the revoked certificate
+    pub user_certificate: felt252, //todo check this, should bebiguint,
+    /// The date on which the revocation occurred is specified.
+    pub revocation_date: felt252, //ASN1Time using felt for now
+    /// Additional information about revocation
+    extensions: Span<Span<Span<u8>>>,
 }

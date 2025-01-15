@@ -237,13 +237,13 @@ pub enum TcbInfo {
 // const my_first_char: str = 'C';
 
 //#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-// #[serde(rename_all = "camelCase")]
+#[derive(Drop)]
 pub struct TcbInfoV2 {
     pub tcb_info: TcbInfoV2Inner,
     pub signature: Signature,
 }
 
-#[derive(Debug, Clone, PartialEq, Serde)]
+#[derive(Debug, Clone, PartialEq, Serde, Drop)]
 pub struct TcbInfoV2Inner {
     pub version: u32,
     pub issue_date: felt252,

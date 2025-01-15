@@ -1,9 +1,8 @@
 // use x509_parser::{certificate::X509Certificate, revocation_list::CertificateRevocationList};
-
+// use crate::utils::cert::{parse_crl_der, parse_x509_der, parse_x509_der_multi, pem_to_der};
+use crate::types::cert::{X509CertificateData, CertificateRevocationList};
 use super::enclave_identity::EnclaveIdentityV2;
 use super::tcbinfo::{TcbInfoV2, TcbInfoV3};
-
-// use crate::utils::cert::{parse_crl_der, parse_x509_der, parse_x509_der_multi, pem_to_der};
 
 #[derive(Clone, Debug)]
 pub struct IntelCollateral {
@@ -16,6 +15,35 @@ pub struct IntelCollateral {
     pub sgx_pck_processor_crl_der: Option<Span<u8>>,
     pub sgx_pck_platform_crl_der: Option<Span<u8>>,
 }
+
+#[derive(Drop)]
+pub enum TcbInfoVersion {
+    V2: TcbInfoV2,
+    V3: TcbInfoV3,
+}
+
+#[derive(Drop)]
+pub struct IntelCollateralData {
+    pub tcbinfo: TcbInfoVersion,
+    pub qeidentity: EnclaveIdentityV2,
+    pub sgx_intel_root_ca: X509CertificateData,
+    pub sgx_tcb_signing: X509CertificateData,
+    pub sgx_pck_certchain: Span<X509CertificateData>,
+    pub sgx_intel_root_ca_crl: Option<CertificateRevocationList>,
+    pub sgx_pck_processor_crl: Option<CertificateRevocationList>,
+    pub sgx_pck_platform_crl: Option<CertificateRevocationList>,
+}
+
+// pub struct IntelCollateralDataV2 {
+//     pub tcbinfo: TcbInfoV2,
+//     pub qeidentity: EnclaveIdentityV2,
+//     pub sgx_intel_root_ca: X509CertificateData,
+//     pub sgx_tcb_signing: X509CertificateData,
+//     pub sgx_pck_certchain: Span<X509CertificateData>,
+//     pub sgx_intel_root_ca_crl: Option<CertificateRevocationList>,
+//     pub sgx_pck_processor_crl: Option<CertificateRevocationList>,
+//     pub sgx_pck_platform_crl: Option<CertificateRevocationList>,
+// }
 
 // builder pattern for IntelCollateralV3
 // impl IntelCollateral {
@@ -347,3 +375,25 @@ pub struct IntelCollateral {
 //         self.sgx_pck_platform_crl_der = Some(sgx_pck_platform_crl_der);
 //     }
 // }
+
+// impl IntelCollateralImpl of IntelCollateral {
+//     fn get_sgx_tcb_signing(collaterals: @IntelCollateral) -> X509CertificateData {
+//         match collaterals.sgx_tcb_signing_der {
+//             Some(der) => parse_x509_der(der),
+//             None => panic!("SGX TCB Signing Cert not set"),
+//         }
+//     }
+// }
+
+// fn get_sgx_tcb_signing(collaterals: @IntelCollateral) -> X509CertificateData {
+//     match collaterals.sgx_tcb_signing_der {
+//         Some(der) => parse_x509_der(der),
+//         None => panic!("SGX TCB Signing Cert not set"),
+//     }
+// }
+
+//get_sgx_intel_root_ca
+//get_sgx_pck_certchain
+//get_sgx_intel_root_ca_crl
+//get_sgx_pck_processor_crl
+//get_sgx_pck_platform_crl

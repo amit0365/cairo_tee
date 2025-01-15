@@ -1,1 +1,2 @@
 mod byte;
+mod compare;
