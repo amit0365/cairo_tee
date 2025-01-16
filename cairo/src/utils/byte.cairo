@@ -269,21 +269,21 @@ fn u8s_typed_to_u256(arr: @[u8; 32]) -> u256 {
 }
 
 // Accepts felt252 for efficiency as it's the type of retdata but all values are expected to fit u32
-fn u32s_to_u8s(mut words: Span<felt252>) -> Span<u8> {
-    let mut output = array![];
-    while let Option::Some(word) = words
-        .pop_front() {
-            let word: u32 = (*word).try_into().unwrap();
-            let (rest, byte_4) = integer::u32_safe_divmod(word, 0x100);
-            let (rest, byte_3) = integer::u32_safe_divmod(rest, 0x100);
-            let (byte_1, byte_2) = integer::u32_safe_divmod(rest, 0x100);
-            output.append(byte_1.try_into().unwrap());
-            output.append(byte_2.try_into().unwrap());
-            output.append(byte_3.try_into().unwrap());
-            output.append(byte_4.try_into().unwrap());
-        };
-    output.span()
-}
+// fn u32s_to_u8s(mut words: Span<felt252>) -> Span<u8> {
+//     let mut output = array![];
+//     while let Option::Some(word) = words
+//         .pop_front() {
+//             let word: u32 = (*word).try_into().unwrap();
+//             let (rest, byte_4) = integer::u32_safe_divmod(word, 0x100);
+//             let (rest, byte_3) = integer::u32_safe_divmod(rest, 0x100);
+//             let (byte_1, byte_2) = integer::u32_safe_divmod(rest, 0x100);
+//             output.append(byte_1.try_into().unwrap());
+//             output.append(byte_2.try_into().unwrap());
+//             output.append(byte_3.try_into().unwrap());
+//             output.append(byte_4.try_into().unwrap());
+//         };
+//     output.span()
+// }
 
 // fn u32s_to_byte_array(mut words: Span<u32>) -> ByteArray {
 //     let mut output: ByteArray = "";
@@ -532,6 +532,15 @@ impl SpanU8TryIntoArrayU8Fixed96 of TryInto<Span<u8>, [u8; 96]> {
             Option::None
         }
     }
+}
+
+pub fn felt252s_to_u8s(arr: Span<felt252>) -> Span<u8> {
+    let mut u8s = array![];
+    for i in 0..arr.len() {
+        let u8: u8 = arr.at(i).deref().try_into().unwrap();
+        u8s.append(u8);
+    };
+    u8s.span()
 }
 
 pub fn felt252s_to_u16(arr: Span<felt252>) -> u16 {

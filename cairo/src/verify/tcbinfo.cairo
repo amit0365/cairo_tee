@@ -4,7 +4,7 @@ use crate::types::tcbinfo::{TcbInfoV2, TcbInfoV3};
 use crate::types::cert::{X509CertificateData};
 use core::sha256::compute_sha256_byte_array;
 use crate::utils::x509_decode::X509CertObj;
-use crate::utils::byte::{u32s_to_u8s, u32s_typed_to_u256, SpanU8TryIntoU256};
+use crate::utils::byte::{felt252s_to_u8s, u32s_typed_to_u256, SpanU8TryIntoU256};
 // use crate::utils::crypto::verify_p256_signature_bytes;
 // use crate::X509Certificate;
 
@@ -27,11 +27,11 @@ pub fn validate_tcbinfov2(tcbinfov2: @TcbInfoV2, sgx_signing_cert: @X509CertObj,
     let mut tcbinfov2_signature_data = array![];
     Serde::serialize(tcbinfov2.tcb_info, ref tcbinfov2_signature_data);
     let (public_key_x, public_key_y) = sgx_signing_cert.subject_public_key;
-    let public_key_x = SpanU8TryIntoU256::try_into(public_key_x.deref()).unwrap();
-    let public_key_y = SpanU8TryIntoU256::try_into(public_key_y.deref()).unwrap();
-    let tcbinfov2_signature_data_u8s = u32s_to_u8s(tcbinfov2_signature_data.span()).into_byte_array(); 
+    let public_key_x = @SpanU8TryIntoU256::try_into(public_key_x.deref()).unwrap();
+    let public_key_y = @SpanU8TryIntoU256::try_into(public_key_y.deref()).unwrap();
+    let tcbinfov2_signature_data_u8s = felt252s_to_u8s(tcbinfov2_signature_data.span()).into_byte_array(); 
     let tcbinfov2_signature_data_hash: u256 = u32s_typed_to_u256(@compute_sha256_byte_array(@tcbinfov2_signature_data_u8s));
-    verify_p256_signature(tcbinfov2_signature_data_hash, (@public_key_x, @public_key_y), tcbinfov2.signature.r, tcbinfov2.signature.s)
+    verify_p256_signature(tcbinfov2_signature_data_hash, (public_key_x, public_key_y), tcbinfov2.signature.r, tcbinfov2.signature.s)
 }
 
 pub fn validate_tcbinfov3(tcbinfov3: @TcbInfoV3, sgx_signing_cert: @X509CertObj, current_time: u64) -> bool {
@@ -55,7 +55,7 @@ pub fn validate_tcbinfov3(tcbinfov3: @TcbInfoV3, sgx_signing_cert: @X509CertObj,
     let (public_key_x, public_key_y) = sgx_signing_cert.subject_public_key;
     let public_key_x = SpanU8TryIntoU256::try_into(public_key_x.deref()).unwrap();
     let public_key_y = SpanU8TryIntoU256::try_into(public_key_y.deref()).unwrap();
-    let tcbinfov3_signature_data = u32s_to_u8s(tcbinfov3_signature_data.span()).into_byte_array(); 
+    let tcbinfov3_signature_data = felt252s_to_u8s(tcbinfov3_signature_data.span()).into_byte_array(); 
     let tcbinfov3_signature_data_hash: u256 = u32s_typed_to_u256(@compute_sha256_byte_array(@tcbinfov3_signature_data));
     verify_p256_signature(tcbinfov3_signature_data_hash, (@public_key_x, @public_key_y), tcbinfov3.signature.r, tcbinfov3.signature.s)
 }

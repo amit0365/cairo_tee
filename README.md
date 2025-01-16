@@ -1,4 +1,4 @@
-TEE Remote Attestation Verification in Cairo (Porting [Automata Rust implementation](https://github.com/automata-network/dcap-rs) to Cairo) - Idea credit and helpful resources from Tarrence from Cartridge.
+TEE Remote Attestation Verification in Cairo (Porting [Automata's DCAP Rust implementation](https://github.com/automata-network/dcap-rs) to Cairo) - Idea credit and helpful resources from Tarrence from Cartridge.
 
 ## Short Introduction to TEE's and Remote Attestations (WIP)
 

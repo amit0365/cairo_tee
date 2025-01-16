@@ -2,7 +2,7 @@ use crate::types::quotes::body::QuoteBody;
 use alexandria_bytes::BytesTrait;
 use core::traits::TryInto;
 use cairo::utils::{
-    byte::{u32s_to_u8s, SpanU8TryIntoArrayU8Fixed2, SpanU8TryIntoArrayU8Fixed4,
+    byte::{felt252s_to_u8s, SpanU8TryIntoArrayU8Fixed2, SpanU8TryIntoArrayU8Fixed4,
     SpanU8TryIntoArrayU8Fixed96, SpanU8TryIntoArrayU8Fixed20, SpanU8TryIntoArrayU8Fixed28, 
     SpanU8TryIntoArrayU8Fixed16, SpanU8TryIntoArrayU8Fixed32, SpanU8TryIntoArrayU8Fixed64, 
     SpanU8TryIntoArrayU8Fixed60, SpanU8TryIntoArrayU8Fixed48, felt252s_to_u32, felt252s_to_u16, felt252s_to_u64},
@@ -45,10 +45,10 @@ impl QuoteHeaderImpl of QuoteHeaderFromBytes {
         let version: u16 = felt252s_to_u16(raw_bytes.slice(0, 2));
         let att_key_type: u16 = felt252s_to_u16(raw_bytes.slice(2, 2));
         let tee_type: u32 = felt252s_to_u32(raw_bytes.slice(4, 4));
-        let qe_svn: [u8; 2] = u32s_to_u8s(raw_bytes.slice(8, 2)).try_into().unwrap();
-        let pce_svn: [u8; 2] = u32s_to_u8s(raw_bytes.slice(10, 2)).try_into().unwrap();
-        let qe_vendor_id: [u8; 16] = u32s_to_u8s(raw_bytes.slice(12, 16)).try_into().unwrap();
-        let user_data: [u8; 20] = u32s_to_u8s(raw_bytes.slice(28, 20)).try_into().unwrap();
+        let qe_svn: [u8; 2] = felt252s_to_u8s(raw_bytes.slice(8, 2)).try_into().unwrap();
+        let pce_svn: [u8; 2] = felt252s_to_u8s(raw_bytes.slice(10, 2)).try_into().unwrap();
+        let qe_vendor_id: [u8; 16] = felt252s_to_u8s(raw_bytes.slice(12, 16)).try_into().unwrap();
+        let user_data: [u8; 20] = felt252s_to_u8s(raw_bytes.slice(28, 20)).try_into().unwrap();
         
 
         QuoteHeader {

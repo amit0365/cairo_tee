@@ -1,5 +1,5 @@
 use cairo::types::cert::{CertificateRevocationList, X509CertificateData, TbsCertificateDataListImpl, TbsCertificateDataImpl};
-use crate::utils::byte::{u32s_to_u8s, u32s_typed_to_u256, u8s_typed_to_u256, SpanU8TryIntoU256};
+use crate::utils::byte::{felt252s_to_u8s, u32s_typed_to_u256, u8s_typed_to_u256, SpanU8TryIntoU256};
 use cairo::verify::crypto::verify_p256_signature;
 use super::super::utils::byte::ArrayU8ExtTrait;
 use core::sha256::compute_sha256_byte_array;
@@ -29,17 +29,17 @@ pub fn verify_certificate(cert: @X509CertObj, signer_cert: @X509CertObj) -> bool
     let data_hash: u256 = u32s_typed_to_u256(@compute_sha256_byte_array(@data));
 
     let (signature_r, signature_s) = cert.signature;
-    let signature_r = SpanU8TryIntoU256::try_into(signature_r.deref()).unwrap();
-    let signature_s = SpanU8TryIntoU256::try_into(signature_s.deref()).unwrap();
+    let signature_r = @SpanU8TryIntoU256::try_into(signature_r.deref()).unwrap();
+    let signature_s = @SpanU8TryIntoU256::try_into(signature_s.deref()).unwrap();
 
     let (public_key_x, public_key_y) = signer_cert.subject_public_key;
-    let public_key_x = SpanU8TryIntoU256::try_into(public_key_x.deref()).unwrap();
-    let public_key_y = SpanU8TryIntoU256::try_into(public_key_y.deref()).unwrap();
+    let public_key_x = @SpanU8TryIntoU256::try_into(public_key_x.deref()).unwrap();
+    let public_key_y = @SpanU8TryIntoU256::try_into(public_key_y.deref()).unwrap();
     // make sure that the issuer is the signer
     if cert.issuer_common_name != signer_cert.issuer_common_name {
         return false;
     }
-    verify_p256_signature(data_hash, (@public_key_x, @public_key_y), @signature_r, @signature_s)
+    verify_p256_signature(data_hash, (public_key_x, public_key_y), signature_r, signature_s)
 }
 
 pub fn verify_crl(crl: @CertificateRevocationList, signer_cert: @X509CertObj) -> bool {
@@ -49,13 +49,13 @@ pub fn verify_crl(crl: @CertificateRevocationList, signer_cert: @X509CertObj) ->
 
     let signature = crl.signature_value;
     let (public_key_x, public_key_y) = signer_cert.subject_public_key;
-    let public_key_x = SpanU8TryIntoU256::try_into(public_key_x.deref()).unwrap();
-    let public_key_y = SpanU8TryIntoU256::try_into(public_key_y.deref()).unwrap();
+    let public_key_x = @SpanU8TryIntoU256::try_into(public_key_x.deref()).unwrap();
+    let public_key_y = @SpanU8TryIntoU256::try_into(public_key_y.deref()).unwrap();
     // make sure that the issuer is the signer
     if crl.tbs_cert_list.issuer.raw != signer_cert.subject_common_name {
         return false;
     }
-    verify_p256_signature(data_hash, (@public_key_x, @public_key_y), signature.r, signature.s)
+    verify_p256_signature(data_hash, (public_key_x, public_key_y), signature.r, signature.s)
 }
 
 // pub fn validate_certificate(

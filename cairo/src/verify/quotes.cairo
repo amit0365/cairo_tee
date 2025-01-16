@@ -2,12 +2,14 @@ use super::tcbinfo::ArrayU8ExtTrait;
 use crate::utils::byte::ByteArrayExtTrait;
 use starknet::secp256_trait::Signature;
 use crate::types::cert::PublicKey;
+use core::array::SpanIntoIterator;
+use core::option::OptionTraitImpl;
 
 mod version_4;
 use crate::types::collaterals::TcbInfoVersion;
 use crate::types::cert::X509CertificateData;
 use crate::constants::{ECDSA_256_WITH_P256_CURVE, INTEL_QE_VENDOR_ID};
-use cairo::utils::compare::{PartialEqU8Array16, PartialEqU8Array20};
+use cairo::utils::compare::{PartialEqU8Array16, PartialEqU8Array20, PartialEqU8Array32, PartialEqU8Array60, PartialEqU8Array64, PartialEqU8Array96};
 use crate::types::cert::IntelSgxCrlsImpl;
 use crate::types::enclave_identity::EnclaveIdentityV2;
 use crate::types::cert::{IntelSgxCrls, SgxExtensions};
@@ -16,7 +18,7 @@ use crate::types::quotes::{
     body::{EnclaveReport, QuoteBody},
     header::QuoteHeader,
 };
-use crate::utils::byte::{SpanU8TryIntoArrayU8Fixed32, u32s_typed_to_u256, u8s_typed_to_u256};
+use crate::utils::byte::{SpanU8TryIntoArrayU8Fixed32, u32s_typed_to_u256, u8s_typed_to_u256, SpanU8TryIntoU256};
 use core::sha256::compute_sha256_byte_array;
 use crate::types::quotes::{CertData, CertDataType};
 use crate::types::tcbinfo::TcbInfo;
@@ -81,7 +83,7 @@ fn common_verify_and_fetch_tcb(
         }
     }
 
-    //let signing_cert_revoked = intel_crls.is_cert_revoked(&signing_cert);
+    // let signing_cert_revoked = intel_crls.is_cert_revoked(@signing_cert);
     // assert!(!signing_cert_revoked, "TCB Signing Cert revoked"); todo check this
     assert!(
         verify_certificate(signing_cert, intel_sgx_root_cert),
@@ -90,25 +92,24 @@ fn common_verify_and_fetch_tcb(
 
     // validate QEIdentity
     let qeidentityv2 = collaterals.qeidentity;
-    assert!(validate_enclave_identityv2(
+    let is_valid_enclave_identity = validate_enclave_identityv2(
         qeidentityv2,
         signing_cert,
         current_time
-    ));
+    );
+    assert!(is_valid_enclave_identity, "Invalid QEIdentity");
 
     // verify QEReport then get TCB Status
-    assert!(
-        verify_qe_report_data(
-            qe_report.report_data.span(),
-            ecdsa_attestation_pubkey,
-            qe_auth_data
-        ),
-        "QE Report Data is incorrect"
+    let is_valid_qe_report_data = verify_qe_report_data(
+        qe_report.report_data.span(),
+        ecdsa_attestation_pubkey,
+        qe_auth_data
     );
-    assert!(
-        validate_qe_report(qe_report, qeidentityv2),
-        "QE Report values do not match with the provided QEIdentity"
-    );
+    assert!(is_valid_qe_report_data, "QE Report Data is incorrect");
+
+    let is_valid_qe_report = validate_qe_report(qe_report, qeidentityv2);
+    assert!(is_valid_qe_report, "QE Report values do not match with the provided QEIdentity");
+
     let qe_tcb_status = get_qe_tcbstatus(qe_report, qeidentityv2);
     assert!(
         qe_tcb_status != TcbStatus::TcbRevoked,
@@ -131,27 +132,25 @@ fn common_verify_and_fetch_tcb(
     // };
 
     // get the pck certificate, and check whether issuer common name is valid
-    let pck_cert = @certchain[0];
+    let pck_cert = certchain[0];
     let pck_cert_issuer = @certchain[1];
-    // assert!(
-    //     check_pck_issuer_and_crl(pck_cert, pck_cert_issuer, @intel_crls),
-    //     "Invalid PCK Issuer or CRL"
-    // );
+    let is_valid_pck_issuer = check_pck_issuer_and_crl(pck_cert, pck_cert_issuer, @intel_crls);
+    assert!(is_valid_pck_issuer, "Invalid PCK Issuer or CRL");
 
     // verify that the cert chain signatures are valid
-    assert!(
-        verify_certchain_signature(@certchain.span(), intel_sgx_root_cert),
-        "Invalid PCK Chain"
-    );
+    let is_valid_certchain_signature = verify_certchain_signature(@certchain.span(), intel_sgx_root_cert);
+    assert!(is_valid_certchain_signature, "Invalid PCK Chain");
 
     // verify the signature for qe report data
-    // let qe_report_bytes = qe_report.to_bytes();
+    let qe_report_bytes = u32s_typed_to_u256(@compute_sha256_byte_array(@(qe_report.raw_bytes).deref().into_byte_array()));
+    let qe_report_signature_r = @SpanU8TryIntoU256::try_into(qe_report_signature.span().slice(0, 32)).unwrap();
+    let qe_report_signature_s = @SpanU8TryIntoU256::try_into(qe_report_signature.span().slice(32, 64)).unwrap();
 
-    // let qe_report_public_key = pck_cert.public_key().subject_public_key.as_ref();
-    // assert!(
-    //     verify_p256_signature_bytes(@qe_report_bytes, qe_report_signature, qe_report_public_key),
-    //     "Invalid qe signature"
-    // );
+    let (qe_report_public_key_x, qe_report_public_key_y) = pck_cert.subject_public_key;
+    let qe_report_public_key_x = @SpanU8TryIntoU256::try_into(qe_report_public_key_x.deref()).unwrap();
+    let qe_report_public_key_y = @SpanU8TryIntoU256::try_into(qe_report_public_key_y.deref()).unwrap();
+    let is_valid_qe_report_signature = verify_p256_signature(qe_report_bytes, (qe_report_public_key_x, qe_report_public_key_y), qe_report_signature_r, qe_report_signature_s);
+    assert!(is_valid_qe_report_signature, "Invalid qe signature");
 
     // get the SGX extension
     //let sgx_extensions = extract_sgx_extension(@pck_cert);
@@ -203,79 +202,84 @@ fn common_verify_and_fetch_tcb(
     (qe_tcb_status, sgx_extensions, tcb_info)
 }
 
-// fn check_pck_issuer_and_crl(
-//     pck_cert: @X509CertObj,
-//     pck_issuer_cert: @X509CertObj,
-//     intel_crls: @IntelSgxCrls,
-// ) -> bool {
-//     // we'll check what kind of cert is it, and validate the appropriate CRL
-//     let pck_cert_subject_cn = get_x509_issuer_cn(pck_cert);
-//     let pck_cert_issuer_cn = get_x509_subject_cn(pck_issuer_cert);
+fn check_pck_issuer_and_crl(
+    pck_cert: @X509CertObj,
+    pck_issuer_cert: @X509CertObj,
+    intel_crls: @IntelSgxCrls,
+) -> bool {
+    // we'll check what kind of cert is it, and validate the appropriate CRL
+    let pck_cert_subject_cn = pck_cert.issuer_common_name;
+    let pck_cert_issuer_cn = pck_issuer_cert.subject_common_name;
 
-//     assert!(
-//         pck_cert_issuer_cn == pck_cert_subject_cn,
-//         "PCK Issuer CN does not match with PCK Intermediate Subject CN"
-//     );
+    assert!(
+        pck_cert_issuer_cn == pck_cert_subject_cn,
+        "PCK Issuer CN does not match with PCK Intermediate Subject CN"
+    );
 
-//     match pck_cert_issuer_cn.as_str() {
-//         "Intel SGX PCK Platform CA" => verify_crl(
-//             intel_crls.sgx_pck_platform_crl.as_ref().unwrap(),
-//             pck_issuer_cert,
-//         ),
-//         "Intel SGX PCK Processor CA" => verify_crl(
-//             &intel_crls.sgx_pck_processor_crl.as_ref().unwrap(),
-//             pck_issuer_cert,
-//         ),
-//         _ => {
-//             panic!("Unknown PCK Cert Subject CN: {}", pck_cert_subject_cn);
-//         }
-//     }
-// }
+    let intel_platform_ba: ByteArray = "Intel SGX PCK Platform CA";
+    let intel_processor_ba: ByteArray = "Intel SGX PCK Processor CA";
+    if pck_cert_issuer_cn.deref().into_byte_array() == intel_platform_ba {
+        match intel_crls.sgx_pck_platform_crl.deref() {
+            Option::Some(crl) => verify_crl(crl, pck_issuer_cert),
+            Option::None => false
+        }
+    } else if pck_cert_issuer_cn.deref().into_byte_array() == intel_processor_ba {
+        match intel_crls.sgx_pck_processor_crl.deref() {
+            Option::Some(crl) => verify_crl(crl, pck_issuer_cert),
+            Option::None => false
+        }
+    } else {
+        panic!("Unknown PCK Cert Subject CN:");
+        false
+    }
+}
 
 fn validate_qe_report(enclave_report: @EnclaveReport, qeidentityv2: @EnclaveIdentityV2) -> bool {
     // make sure that the enclave_identityv2 is a qeidentityv2
     // check that id is "QE", "TD_QE" or "QVE" and version is 2
-    if !((qeidentityv2.enclave_identity.id == "QE"
-        || qeidentityv2.enclave_identity.id == "TD_QE"
-        || qeidentityv2.enclave_identity.id == "QVE")
-        && qeidentityv2.enclave_identity.version == 2)
+    if !((*qeidentityv2.enclave_identity.id == 'QE'
+        || *qeidentityv2.enclave_identity.id == 'TD_QE'
+        || *qeidentityv2.enclave_identity.id == 'QVE')
+        && *qeidentityv2.enclave_identity.version == 2)
     {
         return false;
     }
 
-    let mrsigner_ok = enclave_report.mrsigner
-        == qeidentityv2.enclave_identity.mrsigner.as_slice();
+    let mrsigner_ok = *enclave_report.mrsigner
+        == qeidentityv2.enclave_identity.mrsigner.deref();
     let isvprodid_ok = enclave_report.isv_prod_id == qeidentityv2.enclave_identity.isvprodid;
 
     let attributes = qeidentityv2.enclave_identity.attributes;
     let attributes_mask = qeidentityv2.enclave_identity.attributes_mask;
-    // let masked_attributes = attributes
-    //     .iter()
-    //     .zip(attributes_mask.iter())
-    //     .map(|(a, m)| a & m)
-    //     .collect::<Vec<u8>>();
-    // let masked_enclave_attributes = enclave_report
-    //     .attributes
-    //     .iter()
-    //     .zip(attributes_mask.iter())
-    //     .map(|(a, m)| a & m)
-    //     .collect::<Vec<u8>>();
+    let mut masked_attributes = ArrayTrait::new();
+    for i in 0..attributes.deref().len() {
+        let a = *attributes.deref().at(i);
+        let m = *attributes_mask.deref().at(i);
+        masked_attributes.append(a & m);
+    };
+    let mut masked_enclave_attributes = ArrayTrait::new();
+    for i in 0..enclave_report.attributes.span().len() {
+        let a = *enclave_report.attributes.span().at(i);
+        let m = *attributes_mask.deref().at(i);
+        masked_enclave_attributes.append(a & m);
+    };
     let enclave_attributes_ok = masked_enclave_attributes == masked_attributes;
 
     let miscselect = qeidentityv2.enclave_identity.miscselect;
     let miscselect_mask = qeidentityv2.enclave_identity.miscselect_mask;
-    // let masked_miscselect = miscselect
-    //     .iter()
-    //     .zip(miscselect_mask.iter())
-    //     .map(|(a, m)| a & m)
-    //     .collect::<Vec<u8>>();
-    // let masked_enclave_miscselect = enclave_report
-    //     .misc_select
-    //     .iter()
-    //     .zip(miscselect_mask.iter())
-    //     .map(|(a, m)| a & m)
-    //     .collect::<Vec<u8>>();
-    //let enclave_miscselect_ok = masked_enclave_miscselect == masked_miscselect;
+    let mut masked_miscselect = ArrayTrait::new();
+    for i in 0..miscselect.deref().len() {
+        let a = *miscselect.deref().at(i);
+        let m = *miscselect_mask.deref().at(i);
+        masked_miscselect.append(a & m);
+    };
+    let mut masked_enclave_miscselect = ArrayTrait::new();
+    for i in 0..enclave_report.misc_select.span().len() {
+        let a = *enclave_report.misc_select.span().at(i);
+        let m = *miscselect_mask.deref().at(i);
+        masked_enclave_miscselect.append(a & m);
+    };
+    let enclave_miscselect_ok = masked_enclave_miscselect == masked_miscselect;
 
     mrsigner_ok && isvprodid_ok && enclave_attributes_ok && enclave_miscselect_ok
 }

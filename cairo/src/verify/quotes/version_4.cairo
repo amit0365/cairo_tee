@@ -9,7 +9,9 @@ use crate::types::{
     tcbinfo::{TcbInfo, TcbInfoV3},
     collaterals::IntelCollateral, VerifiedOutput,
 };
+use crate::utils::byte::{felt252s_to_u8s};
 use crate::types::collaterals::IntelCollateralData;
+use crate::types::quotes::{QeReportCertDataRaw, CertDataImpl, QeAuthDataImpl};
 use crate::verify::quotes::common_verify_and_fetch_tcb;
 use crate::utils::byte::{u8s_typed_to_u256, SpanU8TryIntoArrayU8Fixed32, u8s_to_felt252s, felt252s_to_u32, felt252s_to_u16};
 // use crate::utils::cert::get_sgx_tdx_fmspc_tcbstatus_v3;

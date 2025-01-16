@@ -3,7 +3,7 @@ pub mod header;
 pub mod version_4;
 
 use cairo::types::cert::Certificates;
-use cairo::utils::byte::{u32s_to_u8s, felt252s_to_u16, felt252s_to_u32, SpanU8TryIntoArrayU8Fixed64};
+use cairo::utils::byte::{felt252s_to_u16, felt252s_to_u8s, felt252s_to_u32, SpanU8TryIntoArrayU8Fixed64};
 use cairo::types::quotes::body::EnclaveReportImpl;
 use cairo::types::quotes::body::EnclaveReport;
 
@@ -39,7 +39,7 @@ impl CertDataImpl of CertDataFromBytes {
     fn from_bytes(raw_bytes: Span<felt252>) -> CertData {
         let cert_data_type = felt252s_to_u16(raw_bytes.slice(0, 2));
         let cert_data_size = felt252s_to_u32(raw_bytes.slice(2, 4));
-        let cert_data = u32s_to_u8s(raw_bytes.slice(6, cert_data_size));
+        let cert_data = felt252s_to_u8s(raw_bytes.slice(6, cert_data_size));
 
         CertData {
             cert_data_type,
@@ -58,6 +58,14 @@ pub enum CertDataType {
     CertChain: Certificates,
     QeReportCertData: QeReportCertData,
     Type7: Span<u8>,
+}
+
+#[derive(Copy, Drop)]
+pub struct QeReportCertDataRaw {
+    pub qe_report: Span<u8>,
+    pub qe_report_signature: [u8; 64],
+    pub qe_auth_data: QeAuthData,
+    pub qe_cert_data: CertData,
 }
 
 #[derive(Copy, Drop)]
@@ -82,7 +90,7 @@ impl QeAuthDataImpl of QeAuthDataFromBytes {
     fn from_bytes(raw_bytes: Span<felt252>) -> QeAuthData {
         let size = felt252s_to_u16(raw_bytes.slice(0, 2));
         let size_u32 = size.try_into().unwrap();
-        let data = u32s_to_u8s(raw_bytes.slice(2, size_u32));
+        let data = felt252s_to_u8s(raw_bytes.slice(2, size_u32));
         QeAuthData {
             size,
             data,
@@ -99,7 +107,7 @@ impl QeReportCertDataImpl of QeReportCertDataFromBytes {
         // 384 bytes for qe_report
         let qe_report = EnclaveReportImpl::from_bytes(raw_bytes.slice(0, 384));
         // 64 bytes for qe_report_signature
-        let qe_report_signature = u32s_to_u8s(raw_bytes.slice(384, 64)).try_into().unwrap();
+        let qe_report_signature = felt252s_to_u8s(raw_bytes.slice(384, 64)).try_into().unwrap();
         // qe auth data is variable length, we'll pass remaining bytes to the from_bytes method
         let qe_auth_data = QeAuthDataImpl::from_bytes(raw_bytes.slice(448, raw_bytes.len() - 448));
         // get the length of qe_auth_data

@@ -5,7 +5,7 @@ use cairo::types::quotes::body::{EnclaveReportImpl, EnclaveReport};
 use cairo::types::quotes::body::TD10ReportBodyImpl;
 use cairo::constants::{ENCLAVE_REPORT_LEN, SGX_TEE_TYPE, TD10_REPORT_LEN, TDX_TEE_TYPE};
 use cairo::types::quotes::{CertData, CertDataImpl};
-use cairo::utils::byte::{u32s_to_u8s, SpanU8TryIntoArrayU8Fixed2, SpanU8TryIntoArrayU8Fixed4,
+use cairo::utils::byte::{felt252s_to_u8s, SpanU8TryIntoArrayU8Fixed2, SpanU8TryIntoArrayU8Fixed4,
     SpanU8TryIntoArrayU8Fixed96, SpanU8TryIntoArrayU8Fixed20, SpanU8TryIntoArrayU8Fixed28, 
     SpanU8TryIntoArrayU8Fixed16, SpanU8TryIntoArrayU8Fixed32, SpanU8TryIntoArrayU8Fixed64, 
     SpanU8TryIntoArrayU8Fixed60, SpanU8TryIntoArrayU8Fixed48, felt252s_to_u32, felt252s_to_u16, felt252s_to_u64};
@@ -40,8 +40,8 @@ trait QuoteSignatureDataV4FromBytes {
 
 impl QuoteSignatureDataV4Impl of QuoteSignatureDataV4FromBytes {
     fn from_bytes(raw_bytes: Span<felt252>) -> QuoteSignatureDataV4 {
-        let quote_signature = u32s_to_u8s(raw_bytes.slice(0, 64)).try_into().unwrap();
-        let ecdsa_attestation_key = u32s_to_u8s(raw_bytes.slice(64, 64)).try_into().unwrap();
+        let quote_signature = felt252s_to_u8s(raw_bytes.slice(0, 64)).try_into().unwrap();
+        let ecdsa_attestation_key = felt252s_to_u8s(raw_bytes.slice(64, 64)).try_into().unwrap();
         let qe_cert_data = CertDataImpl::from_bytes(raw_bytes.slice(128, 128));
 
         QuoteSignatureDataV4 {

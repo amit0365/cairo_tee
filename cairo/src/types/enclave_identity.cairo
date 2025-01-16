@@ -1,5 +1,5 @@
 use core::starknet::secp256_trait::Signature;
-
+use crate::utils::compare::PartialEqU8Array32;
 // EnclaveIdentityV2:
 //     type: object
 //     description: SGX Enclave Identity data structure encoded as JSON string in case of success
@@ -131,24 +131,24 @@ use core::starknet::secp256_trait::Signature;
 //             description: Hex-encoded string representation of a signature calculated
 //                 over qeIdentity body (without whitespaces) using TCB Info Signing Key.
 
-#[derive(Debug, Clone, PartialEq, Drop)]
+#[derive(Copy, PartialEq, Drop)]
 pub struct EnclaveIdentityV2 {
     pub enclave_identity: EnclaveIdentityV2Inner,
     pub signature: Signature,
 }
 
-#[derive(Debug, Clone, PartialEq, Drop)]
+#[derive(Copy, PartialEq, Drop)]
 pub struct EnclaveIdentityV2Inner {
     pub id: felt252,
     pub version: u64,
     pub issue_date: felt252,
     pub next_update: felt252,
     pub tcb_evaluation_data_number: u64,
-    pub miscselect: felt252,
-    pub miscselect_mask: felt252,
-    pub attributes: felt252,
-    pub attributes_mask: felt252,
-    pub mrsigner: felt252,
+    pub miscselect: Span<u8>,
+    pub miscselect_mask: Span<u8>,
+    pub attributes: Span<u8>,
+    pub attributes_mask: Span<u8>,
+    pub mrsigner: [u8; 32],
     pub isvprodid: u16,
     pub tcb_levels: Span<EnclaveIdentityV2TcbLevelItem>,
 }
