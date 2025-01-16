@@ -1,8 +1,9 @@
 use cairo::types::cert::{CertificateRevocationList, X509CertificateData, TbsCertificateDataListImpl, TbsCertificateDataImpl};
-use crate::utils::byte::{u32s_to_u8s, u32s_typed_to_u256};
+use crate::utils::byte::{u32s_to_u8s, u32s_typed_to_u256, u8s_typed_to_u256, SpanU8TryIntoU256};
 use cairo::verify::crypto::verify_p256_signature;
 use super::super::utils::byte::ArrayU8ExtTrait;
 use core::sha256::compute_sha256_byte_array;
+use cairo::utils::x509_decode::X509CertObj;
 
 // pub fn check_certificate(
 //     cert: @X509CertificateData,
@@ -22,32 +23,39 @@ use core::sha256::compute_sha256_byte_array;
 //     is_cert_valid && is_cert_verified
 // }
 
-pub fn verify_certificate(cert: @X509CertificateData, signer_cert: @X509CertificateData) -> bool {
+pub fn verify_certificate(cert: @X509CertObj, signer_cert: @X509CertObj) -> bool {
     // verifies that the certificate is valid
-    let data = TbsCertificateDataImpl::as_ref(cert.tbs_certificate_data);
-    let data_hash: u256 = u32s_typed_to_u256(@compute_sha256_byte_array(@data.into_byte_array()));
+    let data = cert.tbs.deref().into_byte_array();
+    let data_hash: u256 = u32s_typed_to_u256(@compute_sha256_byte_array(@data));
 
-    let signature = cert.signature_value;
-    let public_key = signer_cert.tbs_certificate_data.subject_pki;
+    let (signature_r, signature_s) = cert.signature;
+    let signature_r = SpanU8TryIntoU256::try_into(signature_r.deref()).unwrap();
+    let signature_s = SpanU8TryIntoU256::try_into(signature_s.deref()).unwrap();
+
+    let (public_key_x, public_key_y) = signer_cert.subject_public_key;
+    let public_key_x = SpanU8TryIntoU256::try_into(public_key_x.deref()).unwrap();
+    let public_key_y = SpanU8TryIntoU256::try_into(public_key_y.deref()).unwrap();
     // make sure that the issuer is the signer
-    if cert.tbs_certificate_data.issuer != signer_cert.tbs_certificate_data.subject {
+    if cert.issuer_common_name != signer_cert.issuer_common_name {
         return false;
     }
-    verify_p256_signature(data_hash, (public_key.x, public_key.y), signature.r, signature.s)
+    verify_p256_signature(data_hash, (@public_key_x, @public_key_y), @signature_r, @signature_s)
 }
 
-pub fn verify_crl(crl: @CertificateRevocationList, signer_cert: @X509CertificateData) -> bool {
+pub fn verify_crl(crl: @CertificateRevocationList, signer_cert: @X509CertObj) -> bool {
     // verifies that the crl is valid
     let data = TbsCertificateDataListImpl::as_ref(crl.tbs_cert_list);
     let data_hash: u256 = u32s_typed_to_u256(@compute_sha256_byte_array(@data.into_byte_array()));
 
     let signature = crl.signature_value;
-    let public_key = signer_cert.tbs_certificate_data.subject_pki;
+    let (public_key_x, public_key_y) = signer_cert.subject_public_key;
+    let public_key_x = SpanU8TryIntoU256::try_into(public_key_x.deref()).unwrap();
+    let public_key_y = SpanU8TryIntoU256::try_into(public_key_y.deref()).unwrap();
     // make sure that the issuer is the signer
-    if crl.tbs_cert_list.issuer != signer_cert.tbs_certificate_data.subject {
+    if crl.tbs_cert_list.issuer.raw != signer_cert.subject_common_name {
         return false;
     }
-    verify_p256_signature(data_hash, (public_key.x, public_key.y), signature.r, signature.s)
+    verify_p256_signature(data_hash, (@public_key_x, @public_key_y), signature.r, signature.s)
 }
 
 // pub fn validate_certificate(
@@ -90,28 +98,41 @@ pub fn verify_crl(crl: @CertificateRevocationList, signer_cert: @X509Certificate
 // }
 
 // // we'll just verify that the certchain signature matches, any other checks will be done by the caller
-// pub fn verify_certchain_signature(
-//     certs: @Span<X509CertificateData>,
-//     root_cert: @X509CertificateData,
-// ) -> bool {
-//     // verify that the cert chain is valid
-//     let mut iter = certs.iter();
-//     let mut prev_cert = iter.next().unwrap();
-//     for cert in iter {
-//         // verify that the previous cert signed the current cert
-//         if !verify_certificate(prev_cert, cert) {
-//             return false;
-//         }
-//         prev_cert = cert;
-//     }
-//     // verify that the root cert signed the last cert
-//     verify_certificate(prev_cert, root_cert)
-// }
+pub fn verify_certchain_signature(
+    certs: @Span<X509CertObj>,
+    root_cert: @X509CertObj,
+) -> bool {
+    // verify that the cert chain is valid
+    let mut valid = false;
+    let mut prev_cert = certs.deref().at(1);
+    for i in 0..certs.deref().len() {
+        let cert = certs.deref().at(i);
+        // verify that the previous cert signed the current cert
+        if !verify_certificate(prev_cert, cert) {
+            valid = false;
+            break;
+        }
+        prev_cert = cert;
+    };
+    // verify that the root cert signed the last cert
+    if valid {
+        valid = verify_certificate(prev_cert, root_cert);
+    };
+    valid
+}
 
-// pub fn is_cert_revoked(
-//     cert: @X509CertificateData,
-//     crl: @CertificateRevocationList,
-// ) -> bool {
-//     crl.iter_revoked_certificates()
-//         .any(|entry| entry.user_certificate == cert.tbs_certificate.serial)
-// }
+pub fn is_cert_revoked(
+    cert: @X509CertificateData,
+    crl: @CertificateRevocationList,
+) -> bool {
+    let mut i = 0;
+    let mut revoked = false;
+    while i < crl.tbs_cert_list.revoked_certificates.deref().len() {
+        if crl.tbs_cert_list.revoked_certificates[i].user_certificate == cert.tbs_certificate_data.serial {
+            revoked = true;
+            break;
+        }
+        i += 1;
+    };
+    revoked
+}

@@ -3,6 +3,7 @@
 use crate::types::cert::{X509CertificateData, CertificateRevocationList};
 use super::enclave_identity::EnclaveIdentityV2;
 use super::tcbinfo::{TcbInfoV2, TcbInfoV3};
+use cairo::utils::x509_decode::X509CertObj;
 
 #[derive(Clone, Debug)]
 pub struct IntelCollateral {
@@ -26,9 +27,9 @@ pub enum TcbInfoVersion {
 pub struct IntelCollateralData {
     pub tcbinfo: TcbInfoVersion,
     pub qeidentity: EnclaveIdentityV2,
-    pub sgx_intel_root_ca: X509CertificateData,
-    pub sgx_tcb_signing: X509CertificateData,
-    pub sgx_pck_certchain: Span<X509CertificateData>,
+    pub sgx_intel_root_ca: X509CertObj,
+    pub sgx_tcb_signing: X509CertObj,
+    pub sgx_pck_certchain: Span<X509CertObj>,
     pub sgx_intel_root_ca_crl: Option<CertificateRevocationList>,
     pub sgx_pck_processor_crl: Option<CertificateRevocationList>,
     pub sgx_pck_platform_crl: Option<CertificateRevocationList>,

@@ -57,7 +57,7 @@ impl X509HelperImpl of X509HelperTrait {
         self.get_common_name(self.first_child_of(tbs_ptr))
     }
 
-    fn get_subject_public_key(self: Span<u8>) -> Span<u8> {
+    fn get_subject_public_key(self: Span<u8>) -> (Span<u8>, Span<u8>) {
         let root = self.root();
         let tbs_parent_ptr = self.first_child_of(root);
         let tbs_ptr = self.first_child_of(tbs_parent_ptr);
@@ -85,11 +85,11 @@ impl X509HelperImpl of X509HelperTrait {
         (not_before, not_after)
     }
 
-    fn get_subject_pki(self: Span<u8>, subject_public_key_info_ptr: u256) -> Span<u8> {
+    fn get_subject_pki(self: Span<u8>, subject_public_key_info_ptr: u256) -> (Span<u8>, Span<u8>) {
         let subject_public_key_info_ptr = self.next_sibling_of(subject_public_key_info_ptr);
         let pub_key = self.bitstring_at(subject_public_key_info_ptr);
         assert(pub_key.len() == 65, 'compressed key not supported');
-        pub_key.slice(0, 64)
+        (pub_key.slice(0, 32), pub_key.slice(32, 64))
     }
 
     fn parse_serial_number(self: Span<u8>) -> felt252 {
@@ -206,15 +206,15 @@ impl X509HelperImpl of X509HelperTrait {
     //     cert.signature = _getSignature(der, sigPtr);
     // }
 
-#[derive(Drop)]
-struct X509CertObj {
+#[derive(Drop, Copy)]
+pub struct X509CertObj {
     tbs: Span<u8>,
     serial_number: felt252,
     issuer_common_name: Span<u8>,
     validity_not_before: u32,
     validity_not_after: u32,
     subject_common_name: Span<u8>,
-    subject_public_key: Span<u8>,
+    subject_public_key: (Span<u8>, Span<u8>),
     signature: (Span<u8>, Span<u8>)  // (r, s)
 }
 

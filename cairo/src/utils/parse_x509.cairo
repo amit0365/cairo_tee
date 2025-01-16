@@ -193,3 +193,4 @@ pub fn main(inputs: Array<Array<u8>>) {
     // let x509_certificate_data = x509_certificate_index.extract_data(der_bytes_parsed);
     // println!("x509_certificate_data {:?}", x509_certificate_data);
 }
+

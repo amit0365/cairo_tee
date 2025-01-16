@@ -82,12 +82,12 @@ pub fn verify_quote_dcapv4(
         panic!("TcbInfo must be V3!")
     };
 
-    // let (quote_tdx_body, tee_tcb_svn) = if let QuoteBody::TD10QuoteBody(body) = &quote.quote_body {
-    //     (Some(body), body.tee_tcb_svn)
-    // } else {
-    //     // SGX does not produce tee_tcb_svns
-    //     (None, [0; 16])
-    // };
+    let (quote_tdx_body, tee_tcb_svn) = if !is_sgx {
+        (Option::Some(quote_body), quote_body.slice(0, 16))
+    } else {
+        // SGX does not produce tee_tcb_svns
+        (Option::None, [0; 16].span())
+    };
 
 //     let tee_type = quote.header.tee_type;
 //     let (sgx_tcb_status, tdx_tcb_status, advisory_ids) =

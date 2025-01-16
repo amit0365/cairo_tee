@@ -4,6 +4,7 @@ use starknet::secp256_trait::Signature;
 use crate::types::cert::PublicKey;
 
 mod version_4;
+use crate::types::collaterals::TcbInfoVersion;
 use crate::types::cert::X509CertificateData;
 use crate::constants::{ECDSA_256_WITH_P256_CURVE, INTEL_QE_VENDOR_ID};
 use cairo::utils::compare::{PartialEqU8Array16, PartialEqU8Array20};
@@ -21,16 +22,17 @@ use crate::types::quotes::{CertData, CertDataType};
 use crate::types::tcbinfo::TcbInfo;
 use crate::types::TcbStatus;
 use crate::verify::enclave_identity::get_qe_tcbstatus;
-
+use crate::utils::pem_decode::PemParserImpl;
+use crate::utils::x509_decode::X509DecodeImpl;
 use crate::verify::cert::{
     //extract_sgx_extension, get_x509_issuer_cn, get_x509_subject_cn, parse_certchain, parse_pem,
-    //verify_certchain_signature, 
+    verify_certchain_signature, 
     verify_certificate, verify_crl,
 };
 use crate::verify::crypto::verify_p256_signature;
 use crate::verify::enclave_identity::validate_enclave_identityv2;
 use crate::verify::tcbinfo::{validate_tcbinfov2, validate_tcbinfov3};
-
+use crate::utils::x509_decode::X509CertObj;
 fn check_quote_header(quote_header: @QuoteHeader, quote_version: u16) -> bool {
     let quote_version_is_valid = *quote_header.version == quote_version;
     let att_key_type_is_supported = *quote_header.att_key_type == ECDSA_256_WITH_P256_CURVE;
@@ -118,26 +120,29 @@ fn common_verify_and_fetch_tcb(
     // we only handle type 5 for now...
     // TODO: Add support for all other types
     assert_eq!(*qe_cert_data.cert_data_type, 5, "QE Cert Type must be 5");
-    // let certchain_pems = parse_pem(@qe_cert_data.cert_data).unwrap();
-    // let certchain = parse_certchain(@certchain_pems);
-    // // checks that the certificates used in the certchain are not revoked
-    // for cert in certchain.iter() {
-    //     assert!(!intel_crls.is_cert_revoked(cert));
-    // }
+    let certchain_pems = PemParserImpl::parse_pem(*qe_cert_data.cert_data);
+    let mut certchain = array![];
+    for i in 0..certchain_pems.len() {
+        certchain.append(X509DecodeImpl::parse_x509_der(*certchain_pems[i].contents));
+    };
+    // checks that the certificates used in the certchain are not revoked
+    // for i in 0..certchain.len() {
+    //     assert!(!intel_crls.is_cert_revoked(certchain[i]));
+    // };
 
     // get the pck certificate, and check whether issuer common name is valid
-    // let pck_cert = @certchain[0];
-    // let pck_cert_issuer = @certchain[1];
+    let pck_cert = @certchain[0];
+    let pck_cert_issuer = @certchain[1];
     // assert!(
-    //     check_pck_issuer_and_crl(pck_cert, pck_cert_issuer, &intel_crls),
+    //     check_pck_issuer_and_crl(pck_cert, pck_cert_issuer, @intel_crls),
     //     "Invalid PCK Issuer or CRL"
     // );
 
     // verify that the cert chain signatures are valid
-    // assert!(
-    //     verify_certchain_signature(@certchain, @intel_sgx_root_cert),
-    //     "Invalid PCK Chain"
-    // );
+    assert!(
+        verify_certchain_signature(@certchain.span(), intel_sgx_root_cert),
+        "Invalid PCK Chain"
+    );
 
     // verify the signature for qe report data
     // let qe_report_bytes = qe_report.to_bytes();
@@ -149,7 +154,7 @@ fn common_verify_and_fetch_tcb(
     // );
 
     // get the SGX extension
-    // let sgx_extensions = extract_sgx_extension(@pck_cert);
+    //let sgx_extensions = extract_sgx_extension(@pck_cert);
 
     // verify the signature for attestation body
     let mut data = array![];
@@ -159,12 +164,12 @@ fn common_verify_and_fetch_tcb(
     let data_hash = u32s_typed_to_u256(@compute_sha256_byte_array(@data.span().into_byte_array()));
 
     let (ecdsa_attestation_signature_r_u8s, ecdsa_attestation_signature_s_u8s) = ecdsa_attestation_signature;
-    let ecdsa_attestation_signature_r = u8s_typed_to_u256(ecdsa_attestation_signature_r_u8s.try_into().unwrap());
-    let ecdsa_attestation_signature_s = u8s_typed_to_u256(ecdsa_attestation_signature_s_u8s.try_into().unwrap());
+    let ecdsa_attestation_signature_r = u8s_typed_to_u256(@ecdsa_attestation_signature_r_u8s.try_into().unwrap());
+    let ecdsa_attestation_signature_s = u8s_typed_to_u256(@ecdsa_attestation_signature_s_u8s.try_into().unwrap());
 
     let (ecdsa_attestation_pubkey_x, ecdsa_attestation_pubkey_y) = ecdsa_attestation_pubkey;
-    let ecdsa_attestation_pubkey_x = u8s_typed_to_u256(ecdsa_attestation_pubkey_x.try_into().unwrap());
-    let ecdsa_attestation_pubkey_y = u8s_typed_to_u256(ecdsa_attestation_pubkey_y.try_into().unwrap());
+    let ecdsa_attestation_pubkey_x = u8s_typed_to_u256(@ecdsa_attestation_pubkey_x.try_into().unwrap());
+    let ecdsa_attestation_pubkey_y = u8s_typed_to_u256(@ecdsa_attestation_pubkey_y.try_into().unwrap());
 
     // todo dont need this if already in bytes
     // match quote_body {
@@ -177,30 +182,31 @@ fn common_verify_and_fetch_tcb(
         "Invalid attestation signature"
     );
 
-    // // validate tcbinfo v2 or v3, depending on the quote version
-    // let tcb_info = if quote_header.version >= 4 {
-    //     let tcb_info_v3 = collaterals.get_tcbinfov3();
-    //     assert!(
-    //         validate_tcbinfov3(@tcb_info_v3, @signing_cert, current_time),
-    //         "Invalid TCBInfoV3"
-    //     );
-    //     TcbInfo::V3(tcb_info_v3)
-    // } else {
-    //     let tcb_info_v2 = collaterals.get_tcbinfov2();
-    //     assert!(
-    //         validate_tcbinfov2(@tcb_info_v2, @signing_cert, current_time),
-    //         "Invalid TCBInfoV2"
-    //     );
-    //     TcbInfo::V2(tcb_info_v2)
-    // };
+    // validate tcbinfo v2 or v3, depending on the quote version
+    let tcb_info = match collaterals.tcbinfo {
+        TcbInfoVersion::V3(tcb_info_v3) => {
+            assert!(
+                validate_tcbinfov3(tcb_info_v3, signing_cert, current_time),
+                "Invalid TCBInfoV3"
+            );
+            TcbInfoVersion::V3(tcb_info_v3.deref())
+        },
+        TcbInfoVersion::V2(tcb_info_v2) => {
+            assert!(
+                validate_tcbinfov2(tcb_info_v2, signing_cert, current_time),
+                "Invalid TCBInfoV2"
+            );
+            TcbInfoVersion::V2(tcb_info_v2.deref())
+        }
+    };
 
     (qe_tcb_status, sgx_extensions, tcb_info)
 }
 
 // fn check_pck_issuer_and_crl(
-//     pck_cert: &X509Certificate,
-//     pck_issuer_cert: &X509Certificate,
-//     intel_crls: &IntelSgxCrls,
+//     pck_cert: @X509CertObj,
+//     pck_issuer_cert: @X509CertObj,
+//     intel_crls: @IntelSgxCrls,
 // ) -> bool {
 //     // we'll check what kind of cert is it, and validate the appropriate CRL
 //     let pck_cert_subject_cn = get_x509_issuer_cn(pck_cert);
