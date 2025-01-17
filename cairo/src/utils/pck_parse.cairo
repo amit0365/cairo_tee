@@ -3,8 +3,35 @@ use super::byte::ArrayU8ExtTrait;
 use cairo::utils::asn1_decode::Asn1DecodeTrait;
 use cairo::utils::time_decode::TimeDecodeTrait;
 use cairo::utils::byte::SpanU8TryIntoArrayU8Fixed16;
-
+use cairo::utils::x509_decode::{X509CertObj, X509DecodeImpl, };
 const SGX_TCB_CPUSVN_SIZE: u32 = 16;
+
+#[derive(Drop, Copy)]
+struct PCKCollateral {
+    pck_chain: Span<X509CertObj>,
+    pck_extension: PCKCertTCB,
+}
+
+#[generate_trait]
+impl PCKCollateralImpl of PCKCollateralTrait {
+    fn new(pck_chain: Span<X509CertObj>, pck_extension: PCKCertTCB) -> PCKCollateral {
+        PCKCollateral { pck_chain, pck_extension }
+    }
+
+    fn default() -> PCKCollateral {
+        let pck_chain = array![X509DecodeImpl::default()].span();
+        let pck_extension = PCKCertTCB { pcesvn: 0, cpusvns: array![].span(), fmspc_bytes: array![].span(), pceid_bytes: array![].span() };
+        PCKCollateral { pck_chain, pck_extension }
+    }
+}
+
+#[derive(Drop, Copy)]
+struct PCKCertTCB {
+    pcesvn: u16,
+    cpusvns: Span<u8>,
+    fmspc_bytes: Span<u8>,
+    pceid_bytes: Span<u8>,
+}
 
 #[derive(Copy, Clone)]
 struct PCKTCBFlags {
@@ -24,7 +51,7 @@ impl PCKHelperImpl of PCKHelperTrait {
         let parent_ptr = self.first_child_of(extension_ptr.into());
         let child_ptr = self.first_child_of(parent_ptr);
 
-        let (success, pcesvn, cpusvns, fmspc_bytes, pceid_bytes) = self._find_pck_tcb_info(child_ptr.try_into().unwrap(), parent_ptr.try_into().unwrap());
+        let (success, pcesvn, cpusvns, fmspc_bytes, pceid_bytes) = self.find_pck_tcb_info(child_ptr.try_into().unwrap(), parent_ptr.try_into().unwrap());
         if !success {
             panic!("invalid SGX extension");
         }
@@ -32,7 +59,7 @@ impl PCKHelperImpl of PCKHelperTrait {
         (pcesvn, cpusvns, fmspc_bytes, pceid_bytes)
     }
 
-    fn _find_pck_tcb_info(self: Span<u8>, ptr: u256, parent_ptr: u256) -> (bool, u16, Span<u8>, Span<u8>, Span<u8>) {
+    fn find_pck_tcb_info(self: Span<u8>, ptr: u256, parent_ptr: u256) -> (bool, u16, Span<u8>, Span<u8>, Span<u8>) {
         // Iterate through elements in Extension sequence until SGX Extension OID found
         let mut current_ptr = ptr;
         let mut pcesvn = 0;
@@ -56,8 +83,6 @@ impl PCKHelperImpl of PCKHelperTrait {
             }
 
             if self.bytes_at(internal_ptr).into_byte_array() == sgx_extension_oid_ba {
-                // Found SGX extension
-                // Found SGX extension, parse the remaining fields
                 let internal_ptr = self.next_sibling_of(internal_ptr.into());
                 let extn_value_parent_ptr = self.root_of_octet_string_at(internal_ptr.into());
                 let mut extn_value_ptr = self.first_child_of(extn_value_parent_ptr);
@@ -143,5 +168,156 @@ impl PCKHelperImpl of PCKHelperTrait {
         };
 
         (true, pcesvn, cpusvns.span().try_into().unwrap())
+    }
+
+    fn get_pck_collateral(self: Span<u8>, cert_type: u16) -> (bool, PCKCollateral) {
+        let mut pck_chain = array![];
+
+        if cert_type == 5 {
+            let (success, cert_array) = self.split_certificate_chain(3);
+            if !success {
+                return (false, PCKCollateralImpl::default());
+            }
+
+            let (pck, extension) = cert_array[0].deref().parse_pck();
+            pck_chain.append(pck);
+
+            let mut issuer_chain = array![];
+            for i in 1..cert_array.len() {
+                issuer_chain.append(*cert_array[i]);
+            };
+
+            let parsed_issuer_chain = issuer_chain.parse_pck_issuer();
+            for i in 0..parsed_issuer_chain.len() {
+                pck_chain.append(parsed_issuer_chain[i].deref());
+            };
+
+            (true, PCKCollateralImpl::new(pck_chain.span(), extension))
+        } else {
+            (false, PCKCollateralImpl::default())
+        }
+    }
+
+    fn parse_pck(self: Span<u8>) -> (X509CertObj, PCKCertTCB) {
+        let pck = X509DecodeImpl::parse_x509_der(self);
+        let (pcesvn, cpusvns, fmspc_bytes, pceid_bytes) = self.parse_pck_extension(pck.extension_ptr);
+        
+        let extension = PCKCertTCB {
+            pcesvn,
+            cpusvns,
+            fmspc_bytes,
+            pceid_bytes
+        };
+
+        (pck, extension)
+    }
+
+    fn parse_pck_issuer(self: Array<Span<u8>>) -> Array<X509CertObj> {
+        let mut chain = array![];
+        for i in 0..self.len() {
+            let issuer_cert = X509DecodeImpl::parse_x509_der(*self[i]);
+            chain.append(issuer_cert);
+        };
+        chain
+    }
+
+    fn split_certificate_chain(self: Span<u8>, size: usize) -> (bool, Array<Span<u8>>) {
+        let mut found = false;
+        let mut certs = array![];
+        let mut input = array![].span();
+        let mut index = 0;
+        let len = self.len();
+
+        for i in 0..size {
+            if i > 0 {
+                input = self.slice(index, index + len);
+            } else {
+                input = self;
+            }
+            let (success, cert, increment) = self.remove_headers_and_footers(input);
+            if !success {
+                found = false;
+                break;
+            }
+
+            // TODO: Base64 decode cert
+            certs.append(cert);
+            index += increment;
+        };
+
+        if !found {
+            return (false, certs);
+        }
+
+        (true, certs)
+    }
+
+    fn remove_headers_and_footers(self: Span<u8>, pem_data: Span<u8>) -> (bool, Span<u8>, u32) {
+        let x509_header = array![0x2D, 0x2D, 0x2D, 0x2D, 0x2D, 0x42, 0x45, 0x47, 0x49, 0x4E, 0x20, 0x43, 0x45, 0x52, 0x54, 0x49, 0x46, 0x49, 0x43, 0x41, 0x54, 0x45, 0x2D, 0x2D, 0x2D, 0x2D, 0x2D].span();
+        let x509_footer = array![0x2D, 0x2D, 0x2D, 0x2D, 0x2D, 0x45, 0x4E, 0x44, 0x20, 0x43, 0x45, 0x52, 0x54, 0x49, 0x46, 0x49, 0x43, 0x41, 0x54, 0x45, 0x2D, 0x2D, 0x2D, 0x2D, 0x2D].span();
+
+        let mut begin_pos = 0;
+        let mut end_pos = 0;
+        let mut header_found = false;
+        let mut footer_found = false;
+
+        // Find header position
+        let mut i = 0;
+        while i < pem_data.len() - x509_header.len() {
+            let mut found = true;
+            let mut j = 0;
+            while j < x509_header.len() {
+                if *pem_data[i + j] != *x509_header[j] {
+                    found = false;
+                    break;
+                }
+                j += 1;
+            };
+            if found {
+                begin_pos = i;
+                header_found = true;
+                break;
+            }
+            i += 1;
+        };
+
+        // Find footer position 
+        i = begin_pos + x509_header.len();
+        while i < pem_data.len() - x509_footer.len() {
+            let mut found = true;
+            let mut j = 0;
+            while j < x509_footer.len() {
+                if *pem_data[i + j] != *x509_footer[j] {
+                    found = false;
+                    break;
+                }
+                j += 1;
+            };
+            if found {
+                end_pos = i;
+                footer_found = true;
+                break;
+            }
+            i += 1;
+        };
+
+        if !header_found || !footer_found {
+            return (false, array![].span(), 0);
+        }
+
+        let content_start = begin_pos + x509_header.len();
+        let content = pem_data.slice(content_start, end_pos - content_start);
+
+        // Remove newlines
+        let mut filtered = ArrayTrait::new();
+        let mut i = 0;
+        while i < content.len() {
+            if *content[i] != 0x0a {
+                filtered.append(*content[i]);
+            }
+            i += 1;
+        };
+
+        (true, filtered.span(), end_pos + x509_footer.len())
     }
 }

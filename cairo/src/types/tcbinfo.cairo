@@ -1,9 +1,6 @@
 use core::starknet::secp256_trait::Signature;
+use crate::types::collaterals::TcbInfo;
 
-pub enum TcbInfo {
-    V2: TcbInfoV2,
-    V3: TcbInfoV3
-}
 
 // TcbInfoV2:
 //     type: object

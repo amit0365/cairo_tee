@@ -6,7 +6,8 @@ use core::array::SpanIntoIterator;
 use core::option::OptionTraitImpl;
 
 mod version_4;
-use crate::types::collaterals::TcbInfoVersion;
+use crate::utils::pck_parse::{PCKHelperImpl, PCKCollateral, PCKHelperTrait, PCKCertTCB};
+use crate::types::collaterals::TcbInfo;
 use crate::types::cert::X509CertificateData;
 use crate::constants::{ECDSA_256_WITH_P256_CURVE, INTEL_QE_VENDOR_ID};
 use cairo::utils::compare::{PartialEqU8Array16, PartialEqU8Array20, PartialEqU8Array32, PartialEqU8Array60, PartialEqU8Array64, PartialEqU8Array96};
@@ -21,7 +22,6 @@ use crate::types::quotes::{
 use crate::utils::byte::{SpanU8TryIntoArrayU8Fixed32, u32s_typed_to_u256, u8s_typed_to_u256, SpanU8TryIntoU256};
 use core::sha256::compute_sha256_byte_array;
 use crate::types::quotes::{CertData, CertDataType};
-use crate::types::tcbinfo::TcbInfo;
 use crate::types::TcbStatus;
 use crate::verify::enclave_identity::get_qe_tcbstatus;
 use crate::utils::pem_decode::PemParserImpl;
@@ -65,7 +65,7 @@ fn common_verify_and_fetch_tcb(
     qe_cert_data: @CertData,
     collaterals: @IntelCollateralData,
     current_time: u64,
-) -> (TcbStatus, SgxExtensions, TcbInfo) {
+) -> (TcbStatus, PCKCertTCB, TcbInfo) {
     let signing_cert = collaterals.sgx_tcb_signing;
     let intel_sgx_root_cert = collaterals.sgx_intel_root_ca;
 
@@ -121,24 +121,22 @@ fn common_verify_and_fetch_tcb(
     // we only handle type 5 for now...
     // TODO: Add support for all other types
     assert_eq!(*qe_cert_data.cert_data_type, 5, "QE Cert Type must be 5");
-    let certchain_pems = PemParserImpl::parse_pem(*qe_cert_data.cert_data);
-    let mut certchain = array![];
-    for i in 0..certchain_pems.len() {
-        certchain.append(X509DecodeImpl::parse_x509_der(*certchain_pems[i].contents));
-    };
+    let (success, pck_collateral) = qe_cert_data.cert_data.deref().get_pck_collateral(*qe_cert_data.cert_data_type);
+    assert!(success, "Failed to get PCK Collateral");
+
     // checks that the certificates used in the certchain are not revoked
     // for i in 0..certchain.len() {
     //     assert!(!intel_crls.is_cert_revoked(certchain[i]));
     // };
 
     // get the pck certificate, and check whether issuer common name is valid
-    let pck_cert = certchain[0];
-    let pck_cert_issuer = @certchain[1];
+    let pck_cert = pck_collateral.pck_chain[0]; // todo check if we need these
+    let pck_cert_issuer = pck_collateral.pck_chain[1];
     let is_valid_pck_issuer = check_pck_issuer_and_crl(pck_cert, pck_cert_issuer, @intel_crls);
     assert!(is_valid_pck_issuer, "Invalid PCK Issuer or CRL");
 
     // verify that the cert chain signatures are valid
-    let is_valid_certchain_signature = verify_certchain_signature(@certchain.span(), intel_sgx_root_cert);
+    let is_valid_certchain_signature = verify_certchain_signature(@pck_collateral.pck_chain, intel_sgx_root_cert);
     assert!(is_valid_certchain_signature, "Invalid PCK Chain");
 
     // verify the signature for qe report data
@@ -153,7 +151,7 @@ fn common_verify_and_fetch_tcb(
     assert!(is_valid_qe_report_signature, "Invalid qe signature");
 
     // get the SGX extension
-    //let sgx_extensions = extract_sgx_extension(@pck_cert);
+    let sgx_extensions = pck_collateral.pck_extension;
 
     // verify the signature for attestation body
     let mut data = array![];
@@ -183,19 +181,19 @@ fn common_verify_and_fetch_tcb(
 
     // validate tcbinfo v2 or v3, depending on the quote version
     let tcb_info = match collaterals.tcbinfo {
-        TcbInfoVersion::V3(tcb_info_v3) => {
+        TcbInfo::V3(tcb_info_v3) => {
             assert!(
                 validate_tcbinfov3(tcb_info_v3, signing_cert, current_time),
                 "Invalid TCBInfoV3"
             );
-            TcbInfoVersion::V3(tcb_info_v3.deref())
+            TcbInfo::V3(tcb_info_v3.deref())
         },
-        TcbInfoVersion::V2(tcb_info_v2) => {
+        TcbInfo::V2(tcb_info_v2) => {
             assert!(
                 validate_tcbinfov2(tcb_info_v2, signing_cert, current_time),
                 "Invalid TCBInfoV2"
             );
-            TcbInfoVersion::V2(tcb_info_v2.deref())
+            TcbInfo::V2(tcb_info_v2.deref())
         }
     };
 

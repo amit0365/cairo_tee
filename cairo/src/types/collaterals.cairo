@@ -18,14 +18,14 @@ pub struct IntelCollateral {
 }
 
 #[derive(Drop)]
-pub enum TcbInfoVersion {
+pub enum TcbInfo {
     V2: TcbInfoV2,
     V3: TcbInfoV3,
 }
 
 #[derive(Drop)]
 pub struct IntelCollateralData {
-    pub tcbinfo: TcbInfoVersion,
+    pub tcbinfo: TcbInfo,
     pub qeidentity: EnclaveIdentityV2,
     pub sgx_intel_root_ca: X509CertObj,
     pub sgx_tcb_signing: X509CertObj,

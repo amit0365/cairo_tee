@@ -215,11 +215,16 @@ pub struct X509CertObj {
     validity_not_after: u32,
     subject_common_name: Span<u8>,
     subject_public_key: (Span<u8>, Span<u8>),
-    signature: (Span<u8>, Span<u8>)  // (r, s)
+    signature: (Span<u8>, Span<u8>),  // (r, s)
+    extension_ptr: u256,
 }
 
 #[generate_trait]
 impl X509DecodeImpl of X509DecodeTrait {
+    fn default() -> X509CertObj {
+        X509CertObj { tbs: array![].span(), serial_number: 0, issuer_common_name: array![].span(), validity_not_before: 0, validity_not_after: 0, subject_common_name: array![].span(), subject_public_key: (array![].span(), array![].span()), signature: (array![].span(), array![].span()), extension_ptr: 0 }
+    }
+
     fn parse_x509_der(self: Span<u8>) -> X509CertObj {
         let root = self.root();
         
@@ -244,6 +249,8 @@ impl X509DecodeImpl of X509DecodeTrait {
         
         tbs_ptr = self.next_sibling_of(tbs_ptr);
         let subject_public_key = self.get_subject_pki(self.first_child_of(tbs_ptr));
+
+        let extension_ptr = self.next_sibling_of(tbs_ptr);
         
         let sig_ptr = self.next_sibling_of(tbs_parent_ptr);
         let sig_ptr = self.next_sibling_of(sig_ptr);
@@ -258,6 +265,7 @@ impl X509DecodeImpl of X509DecodeTrait {
             subject_common_name,
             subject_public_key,
             signature,
+            extension_ptr,
         }
     }
 }
