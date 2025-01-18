@@ -1,7 +1,7 @@
 use crate::types::tcbinfo::TcbInfoV3;
 use crate::types::TcbStatus;
 use crate::utils::byte::{felt252s_to_u64, u8s_to_felt252s};
-use crate::types::TcbStatusImpl;
+use crate::types::tcbinfo::TcbStatusImpl;
 use cairo::utils::byte::SpanU8TryIntoArrayU8Fixed48;
 
 // https://github.com/intel/SGX-TDX-DCAP-QuoteVerificationLibrary/blob/7e5b2a13ca5472de8d97dd7d7024c2ea5af9a6ba/Src/AttestationLibrary/src/Verifiers/Checks/TdxModuleCheck.cpp#L62-L97

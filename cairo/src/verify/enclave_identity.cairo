@@ -3,7 +3,7 @@ use crate::verify::crypto::verify_p256_signature;
 use crate::types::cert::X509CertificateData;
 use crate::utils::x509_decode::X509CertObj;
 use core::sha256::compute_sha256_byte_array;
-use crate::types::TcbStatusImpl;
+use crate::types::tcbinfo::TcbStatusImpl;
 use super::super::utils::byte::ArrayU8ExtTrait;
 use crate::utils::byte::{felt252s_to_u8s, u32s_typed_to_u256, SpanU8TryIntoU256};
 

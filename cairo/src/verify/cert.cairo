@@ -4,6 +4,10 @@ use cairo::verify::crypto::verify_p256_signature;
 use super::super::utils::byte::ArrayU8ExtTrait;
 use core::sha256::compute_sha256_byte_array;
 use cairo::utils::x509_decode::X509CertObj;
+use crate::utils::pck_parse::PCKCertTCB;
+use crate::types::tcbinfo::TcbInfoV3;
+use crate::types::TcbStatus;
+use core::array::SpanIntoIterator;
 
 // pub fn check_certificate(
 //     cert: @X509CertificateData,
@@ -136,3 +140,58 @@ pub fn is_cert_revoked(
     };
     revoked
 }
+
+// // Slightly modified from https://github.com/intel/SGX-TDX-DCAP-QuoteVerificationLibrary/blob/7e5b2a13ca5472de8d97dd7d7024c2ea5af9a6ba/Src/AttestationLibrary/src/Verifiers/Checks/TcbLevelCheck.cpp#L129-L181
+// pub fn get_sgx_tdx_fmspc_tcbstatus_v3(
+//     tee_type: u32,
+//     sgx_extensions: @PCKCertTCB,
+//     tee_tcb_svn: [u8; 16],
+//     tcbinfov3: @TcbInfoV3,
+// ) -> (TcbStatus, TcbStatus, Option<Span<String>>) {
+//     // we'll make sure the tcbinforoot is valid
+//     // check that fmspc is valid
+//     // check that pceid is valid
+
+//     // convert tcbinfo fmspc and pceid from string to bytes for comparison
+//     assert!(sgx_extensions.fmspc_bytes == tcbinfov3.tcb_info.fmspc);
+//     assert!(sgx_extensions.pceid_bytes == tcbinfov3.tcb_info.pce_id);
+
+//     let mut sgx_tcb_status = TcbStatus::TcbUnrecognized;
+//     let mut tdx_tcb_status = TcbStatus::TcbUnrecognized;
+
+//     let extension_pcesvn = sgx_extensions.pcesvn;
+//     let mut advisory_ids = Option::None;
+
+//     for tcb_level in tcbinfov3.tcb_info.tcb_levels.deref().into_iter() {
+//         if sgx_tcb_status == TcbStatus::TcbUnrecognized {
+//             let sgxtcbcomponents_ok =
+//                 match_sgxtcbcomp(sgx_extensions, @tcb_level.tcb.sgxtcbcomponents);
+//             let pcesvn_ok = extension_pcesvn >= tcb_level.pcesvn;
+//             if sgxtcbcomponents_ok && pcesvn_ok {
+//                 sgx_tcb_status = TcbStatus::from_str(tcb_level.tcb_status.as_str());
+//                 if tee_type == SGX_TEE_TYPE {
+//                     advisory_ids = tcb_level.advisory_ids.clone();
+//                 }
+//             }
+//         }
+//         if sgx_tcb_status != TcbStatus::TcbUnrecognized || sgx_tcb_status != TcbStatus::TcbRevoked {
+//             if !is_empty(tee_tcb_svn) {
+//                 let tdxtcbcomponents_ok = match tcb_level.tcb.tdxtcbcomponents.as_ref() {
+//                     Some(tdxtcbcomponents) => tdxtcbcomponents
+//                         .iter()
+//                         .zip(tee_tcb_svn.iter())
+//                         .all(|(tcb, tee)| *tee >= tcb.svn as u8),
+//                     None => true,
+//                 };
+//                 if tdxtcbcomponents_ok {
+//                     tdx_tcb_status = TcbStatus::from_str(tcb_level.tcb_status.as_str());
+//                     if tee_type == TDX_TEE_TYPE {
+//                         advisory_ids = tcb_level.advisory_ids.clone();
+//                     }
+//                     break;
+//                 }
+//             }
+//         }
+//     };
+//     (sgx_tcb_status, tdx_tcb_status, advisory_ids)
+// }

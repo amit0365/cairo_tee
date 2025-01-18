@@ -1,6 +1,111 @@
 use core::starknet::secp256_trait::Signature;
 use crate::types::collaterals::TcbInfo;
+use crate::utils::byte::{u8_to_u16, u8_to_u64, ArrayU8Ext};
 
+pub enum TcbId {
+    /// the "id" field is absent from TCBInfo V2
+    /// which defaults TcbId to SGX
+    /// since TDX TCBInfos are only included in V3 or above
+    SGX,
+    TDX
+}
+
+#[derive(Debug, Copy, PartialEq, Serde, Drop)]
+pub enum TcbStatus {
+    OK,
+    TcbSwHardeningNeeded,
+    TcbConfigurationAndSwHardeningNeeded,
+    TcbConfigurationNeeded,
+    TcbOutOfDate,
+    TcbOutOfDateConfigurationNeeded,
+    TcbRevoked,
+    TcbUnrecognized,
+}
+
+trait TcbStatusFromStr {
+    fn from_str(s: ByteArray) -> TcbStatus;
+}
+
+impl TcbStatusImpl of TcbStatusFromStr {
+    fn from_str(s: ByteArray) -> TcbStatus {
+        if s == "UpToDate" {
+            TcbStatus::OK
+        } else if s == "SWHardeningNeeded" {
+            TcbStatus::TcbSwHardeningNeeded
+        } else if s == "ConfigurationAndSWHardeningNeeded" {
+            TcbStatus::TcbConfigurationAndSwHardeningNeeded
+        } else if s == "ConfigurationNeeded" {
+            TcbStatus::TcbConfigurationNeeded
+        } else if s == "OutOfDate" {
+            TcbStatus::TcbOutOfDate
+        } else if s == "OutOfDateConfigurationNeeded" {
+            TcbStatus::TcbOutOfDateConfigurationNeeded
+        } else if s == "Revoked" {
+            TcbStatus::TcbRevoked
+        } else {
+            TcbStatus::TcbUnrecognized
+        }
+    }
+}
+
+#[derive(Debug, Copy, PartialEq, Serde, Drop)]
+pub struct TCBLevelsObj {
+    pcesvn: u16,
+    sgx_component_cpu_svns: Span<u8>,
+    tdx_component_cpu_svns: Span<u8>,
+    tcb_date_timestamp: u64,
+    status: TcbStatus,
+    advisory_ids: Span<u8>, //[]string
+}
+
+#[generate_trait]
+impl TCBLevelsObjImpl of TCBLevelsObjTrait {
+    fn from_bytes(bytes: Span<u8>) -> TCBLevelsObj {
+        let mut offset = 0;
+        let pcesvn = u8_to_u16(bytes.slice(offset, 2));
+        offset += 2;
+        let sgx_component_cpu_svns = bytes.slice(offset, 16);
+        offset += 16;
+        let tdx_component_cpu_svns = bytes.slice(offset, 16);
+        offset += 16;
+        let tcb_date_timestamp = u8_to_u64(bytes.slice(offset, 8));
+        offset += 8;
+        let status = TcbStatusImpl::from_str(bytes.slice(offset, 10).into_byte_array());
+        offset += 10;
+        let advisory_ids = bytes.slice(offset, 10);
+        offset += 10;
+
+        TCBLevelsObj {
+            pcesvn,
+            sgx_component_cpu_svns,
+            tdx_component_cpu_svns,
+            tcb_date_timestamp,
+            status,
+            advisory_ids,
+        }
+    }
+}
+
+#[derive(Debug, Copy, PartialEq, Serde, Drop)]
+pub struct TDXModule {
+    mrsigner: Span<u8>, // 48 bytes
+    attributes: [u8; 8],
+    attributes_mask: [u8; 8],
+}
+
+pub struct TDXModuleTCBLevelsObj {
+    isvsvn: u8,
+    tcb_date_timestamp: u64,
+    status: TcbStatus,
+}
+
+pub struct TDXModuleIdentity {
+    id: u8,
+    attributes: [u8; 8],
+    attributes_mask: [u8; 8],
+    mrsigner: Span<u8>, // 48 bytes
+    tcb_levels: Span<TDXModuleTCBLevelsObj>,
+}
 
 // TcbInfoV2:
 //     type: object
@@ -568,8 +673,8 @@ pub struct TcbInfoV3Inner {
     pub version: u32,
     pub issue_date: felt252,
     pub next_update: felt252,
-    pub fmspc: felt252,
-    pub pce_id: felt252,
+    pub fmspc: Span<u8>,
+    pub pce_id: Span<u8>,
     pub tcb_type: u64,
     pub tcb_evaluation_data_number: u32,
     //#[serde(skip_serializing_if = "Option::is_none")]

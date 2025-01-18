@@ -110,12 +110,14 @@ fn common_verify_and_fetch_tcb(
     let is_valid_qe_report = validate_qe_report(qe_report, qeidentityv2);
     assert!(is_valid_qe_report, "QE Report values do not match with the provided QEIdentity");
 
+    // Step 1: Fetch QEIdentity to validate TCB of the QE
     let qe_tcb_status = get_qe_tcbstatus(qe_report, qeidentityv2);
     assert!(
         qe_tcb_status != TcbStatus::TcbRevoked,
         "QEIdentity TCB Revoked"
     );
 
+    // Step 3: verify cert chain
     // get the certchain embedded in the ecda quote signature data
     // this can be one of 5 types
     // we only handle type 5 for now...
@@ -139,6 +141,7 @@ fn common_verify_and_fetch_tcb(
     let is_valid_certchain_signature = verify_certchain_signature(@pck_collateral.pck_chain, intel_sgx_root_cert);
     assert!(is_valid_certchain_signature, "Invalid PCK Chain");
 
+    // Step 4: Signature Verification on local isv report and qereport by PCK
     // verify the signature for qe report data
     let qe_report_bytes = u32s_typed_to_u256(@compute_sha256_byte_array(@(qe_report.raw_bytes).deref().into_byte_array()));
     let qe_report_signature_r = @SpanU8TryIntoU256::try_into(qe_report_signature.span().slice(0, 32)).unwrap();
@@ -299,23 +302,22 @@ fn verify_qe_report_data(
 }
 
 // // https://github.com/intel/SGX-TDX-DCAP-QuoteVerificationLibrary/blob/16b7291a7a86e486fdfcf1dfb4be885c0cc00b4e/Src/AttestationLibrary/src/Verifiers/QuoteVerifier.cpp#L271-L312
-// fn converge_tcb_status_with_qe_tcb(tcb_status: TcbStatus, qe_tcb_status: TcbStatus) -> TcbStatus {
-//     let converged_tcb_status: TcbStatus;
-//     match qe_tcb_status {
-//         TcbStatus::TcbOutOfDate => {
-//             if tcb_status == TcbStatus::OK || tcb_status == TcbStatus::TcbSwHardeningNeeded {
-//                 converged_tcb_status = TcbStatus::TcbOutOfDate;
-//             } else if tcb_status == TcbStatus::TcbConfigurationNeeded
-//                 || tcb_status == TcbStatus::TcbConfigurationAndSwHardeningNeeded
-//             {
-//                 converged_tcb_status = TcbStatus::TcbOutOfDateConfigurationNeeded;
-//             } else {
-//                 converged_tcb_status = tcb_status;
-//             }
-//         },
-//         _ => {
-//             converged_tcb_status = tcb_status;
-//         }
-//     }
-//     converged_tcb_status
-// }
+fn converge_tcb_status_with_qe_tcb(tcb_status: TcbStatus, qe_tcb_status: TcbStatus) -> TcbStatus {
+    let converged_tcb_status = match qe_tcb_status {
+        TcbStatus::TcbOutOfDate => {
+            if tcb_status == TcbStatus::OK || tcb_status == TcbStatus::TcbSwHardeningNeeded {
+                TcbStatus::TcbOutOfDate
+            } else if tcb_status == TcbStatus::TcbConfigurationNeeded
+                || tcb_status == TcbStatus::TcbConfigurationAndSwHardeningNeeded
+            {
+                TcbStatus::TcbOutOfDateConfigurationNeeded
+            } else {
+                tcb_status
+            }
+        },
+        _ => {
+            tcb_status
+        }
+    };
+    converged_tcb_status
+}

@@ -5,3 +5,4 @@ mod x509_decode;
 mod time_decode;
 mod pem_decode;
 mod pck_parse;
+mod fmspc_tcb_parse;

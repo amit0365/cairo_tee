@@ -375,6 +375,16 @@ impl SpanU8TryIntoArrayU8Fixed4 of TryInto<Span<u8>, [u8; 4]> {
     }
 }
 
+impl SpanU8TryIntoArrayU8Fixed6 of TryInto<Span<u8>, [u8; 6]> {
+    fn try_into(self: Span<u8>) -> Option<[u8; 6]> {
+        if self.len() == 6 {
+            Option::Some([*self.at(0), *self.at(1), *self.at(2), *self.at(3), *self.at(4), *self.at(5)])
+        } else {
+            Option::None
+        }
+    }
+}
+
 impl SpanU8TryIntoArrayU8Fixed28 of TryInto<Span<u8>, [u8; 28]> {
     fn try_into(self: Span<u8>) -> Option<[u8; 28]> {
         if self.len() == 28 {
@@ -569,4 +579,22 @@ pub fn felt252s_to_u64(arr: Span<felt252>) -> u64 {
         + *arr.at(1) * 0x1000000000000
         + *arr.at(0) * 0x100000000000000;
     value.try_into().expect('felt252s_to_u64:overflow')
+}
+
+pub fn u8_to_u16(arr: Span<u8>) -> u16 {
+    assert!(arr.len() == 2, "u8_to_u16: input must be 2 elements long");
+    let value: u16 = (*arr.at(0)).into() * 0x100_u16 + (*arr.at(1)).into();
+    value
+}
+
+pub fn u8_to_u32(arr: Span<u8>) -> u32 {
+    assert!(arr.len() == 4, "u8_to_u32: input must be 4 elements long");
+    let value: u32 = (*arr.at(0)).into() * 0x100_u32 + (*arr.at(1)).into() * 0x100_u32 + (*arr.at(2)).into() * 0x100_u32 + (*arr.at(3)).into();
+    value
+}
+
+pub fn u8_to_u64(arr: Span<u8>) -> u64 {
+    assert!(arr.len() == 8, "u8_to_u64: input must be 8 elements long");
+    let value: u64 = (*arr.at(0)).into() * 0x100_u64 + (*arr.at(1)).into() * 0x100_u64 + (*arr.at(2)).into() * 0x100_u64 + (*arr.at(3)).into() * 0x100_u64 + (*arr.at(4)).into() * 0x100_u64 + (*arr.at(5)).into() * 0x100_u64 + (*arr.at(6)).into() * 0x100_u64 + (*arr.at(7)).into();
+    value
 }

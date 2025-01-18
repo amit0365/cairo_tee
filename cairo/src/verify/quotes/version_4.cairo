@@ -3,17 +3,20 @@ use starknet::secp256_trait::Signature;
 use crate::types::quotes::body::QuoteBody;
 use crate::types::quotes::version_4::QuoteV4;
 use crate::types::quotes::{CertDataType, QeReportCertData, QeReportCertDataImpl};
-use crate::types::{TcbStatus};
+use crate::types::tcbinfo::{TCBLevelsObj, TCBLevelsObjImpl};
+use crate::utils::pck_parse::{PCKHelperImpl, PCKCertTCB};
 use crate::types::{
     cert::PublicKey,
     tcbinfo::{TcbInfo, TcbInfoV3},
     collaterals::IntelCollateral, VerifiedOutput,
 };
-use crate::utils::byte::{felt252s_to_u8s};
+
 use crate::types::collaterals::IntelCollateralData;
 use crate::types::quotes::{QeReportCertDataRaw, CertDataImpl, QeAuthDataImpl};
-use crate::verify::quotes::common_verify_and_fetch_tcb;
-use crate::utils::byte::{u8s_typed_to_u256, SpanU8TryIntoArrayU8Fixed32, u8s_to_felt252s, felt252s_to_u32, felt252s_to_u16};
+use crate::verify::quotes::{common_verify_and_fetch_tcb, converge_tcb_status_with_qe_tcb};
+use crate::utils::byte::{felt252s_to_u8s, u8_to_u16, u8_to_u32, u8s_typed_to_u256, 
+    SpanU8TryIntoArrayU8Fixed32, SpanU8TryIntoArrayU8Fixed6, u8s_to_felt252s, felt252s_to_u32, felt252s_to_u16};
+
 // use crate::utils::cert::get_sgx_tdx_fmspc_tcbstatus_v3;
 // use crate::utils::tdx_module::{
 //     converge_tcb_status_with_tdx_module_tcb, get_tdx_module_identity_and_tcb,
@@ -25,11 +28,17 @@ pub fn verify_quote_dcapv4(
     raw_quote: Span<u8>,
     is_sgx: bool,
     collaterals: @IntelCollateralData,
+    tcb_data: Span<u8>,
     current_time: u64,
 ) -> VerifiedOutput {
 
     let mut offset = 0;
+    let quote_header_version = u8_to_u16(raw_quote.slice(0, 2));
+    let quote_header_tee_type = u8_to_u32(raw_quote.slice(4, 4));
+
     let quote_header = raw_quote.slice(offset, 48);
+
+
     offset += 48;
     let quote_body = if is_sgx {
         offset += 384;
@@ -65,6 +74,7 @@ pub fn verify_quote_dcapv4(
         panic!("Unsupported CertDataType in QuoteSignatureDataV4")
     };
 
+    // Verify Step 1: Perform verification steps that are required for both SGX and TDX quotes
     let (qe_tcb_status, sgx_extensions, tcb_info) = common_verify_and_fetch_tcb(
         quote_header,
         quote_body,
@@ -78,6 +88,7 @@ pub fn verify_quote_dcapv4(
         current_time,
     );
 
+    // Verify Step 2: Check TCBStatus against isvs in the SGXComponent of the matching tcblevel
     let tcb_info_v3 = if let TcbInfo::V3(tcb) = tcb_info {
         tcb
     } else {
@@ -91,10 +102,13 @@ pub fn verify_quote_dcapv4(
         (Option::None, [0; 16].span())
     };
 
-//     let tee_type = quote.header.tee_type;
-//     let (sgx_tcb_status, tdx_tcb_status, advisory_ids) =
-//         get_sgx_tdx_fmspc_tcbstatus_v3(tee_type, &sgx_extensions, &tee_tcb_svn, &tcb_info_v3);
+    // let tee_type = quote.header.tee_type;
+    // let (sgx_tcb_status, tdx_tcb_status, advisory_ids) =
+    // get_sgx_tdx_fmspc_tcbstatus_v3(tee_type, @sgx_extensions, @tee_tcb_svn, @tcb_info_v3);
     
+    let tcb_levels = TCBLevelsObjImpl::from_bytes(tcb_data); // get tcb levels from pccs
+    let (sgx_tcb_status_found, sgx_tcb_status) = sgx_extensions.get_sgx_tcb_status(tcb_levels); // only handle SGX for now
+
 //     assert!(
 //         sgx_tcb_status != TcbStatus::TcbRevoked || tdx_tcb_status != TcbStatus::TcbRevoked,
 //         "FMSPC TCB Revoked"
@@ -132,14 +146,15 @@ pub fn verify_quote_dcapv4(
 //         tcb_status = converge_tcb_status_with_tdx_module_tcb(tcb_status, tdx_module_tcb_status)
 //     }
 
-//     tcb_status = converge_tcb_status_with_qe_tcb(tcb_status, qe_tcb_status);
+// Verify Step 3: Converge QEIdentity and FMSPC TCB Status
+    let tcb_status = converge_tcb_status_with_qe_tcb(sgx_tcb_status, qe_tcb_status);
 
-//     VerifiedOutput {
-//         quote_version: quote.header.version,
-//         tee_type: quote.header.tee_type,
-//         tcb_status,
-//         fmspc: sgx_extensions.fmspc,
-//         quote_body: quote.quote_body,
-//         advisory_ids: advisory_ids
-//     }
+    VerifiedOutput {
+        quote_version: quote_header_version,
+        tee_type: quote_header_tee_type,
+        tcb_status,
+        fmspc: sgx_extensions.fmspc_bytes.try_into().unwrap(),
+        quote_body: quote_body,
+        advisory_ids: Option::Some(tcb_levels.advisory_ids)
+    }
 }

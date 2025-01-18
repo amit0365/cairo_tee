@@ -67,6 +67,30 @@ impl IntelSgxCrlsImpl of IntelSgxCrlsTrait {
             sgx_pck_platform_crl: collaterals.sgx_pck_platform_crl,
         }
     }
+
+    // fn is_cert_revoked(self: @IntelSgxCrls, cert: @X509CertificateData) -> bool {
+    //     let crl = match get_crl_uri(cert) {
+    //         Some(crl_uri) => {
+    //             if crl_uri.contains("https://api.trustedservices.intel.com/sgx/certification/v3/pckcrl?ca=platform")
+    //                 || crl_uri.contains("https://api.trustedservices.intel.com/sgx/certification/v4/pckcrl?ca=platform") {
+    //                 self.sgx_pck_platform_crl.as_ref()
+    //             } else if crl_uri.contains("https://api.trustedservices.intel.com/sgx/certification/v3/pckcrl?ca=processor")
+    //                 || crl_uri.contains("https://api.trustedservices.intel.com/sgx/certification/v4/pckcrl?ca=processor") {
+    //                 self.sgx_pck_processor_crl.as_ref()
+    //             } else if crl_uri.contains("https://certificates.trustedservices.intel.com/IntelSGXRootCA.der") {
+    //                 self.sgx_root_ca_crl.as_ref()
+    //             } else {
+    //                 panic!("Unknown CRL URI: {}", crl_uri);
+    //             }
+    //         },
+    //         None => {
+    //             panic!("No CRL URI found in certificate");
+    //         }
+    //     }.unwrap();
+
+    //     // check if the cert is revoked given the crl
+    //     is_cert_revoked(cert, crl)
+    // }
 }
 
 // #[generate_trait]

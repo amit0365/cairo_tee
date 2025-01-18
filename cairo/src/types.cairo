@@ -3,47 +3,12 @@ pub mod cert;
 pub mod tcbinfo;
 pub mod collaterals;
 pub mod enclave_identity;
+use crate::types::tcbinfo::TcbStatus;
 use crate::types::quotes::body::QuoteBody;
 use crate::constants::{ENCLAVE_REPORT_LEN, SGX_TEE_TYPE, TD10_REPORT_LEN, TDX_TEE_TYPE};
 // use alloy_sol_types::SolValue;
 
-#[derive(Debug, Clone, PartialEq, Serde, Drop)]
-pub enum TcbStatus {
-    OK,
-    TcbSwHardeningNeeded,
-    TcbConfigurationAndSwHardeningNeeded,
-    TcbConfigurationNeeded,
-    TcbOutOfDate,
-    TcbOutOfDateConfigurationNeeded,
-    TcbRevoked,
-    TcbUnrecognized,
-}
 
-trait TcbStatusFromStr {
-    fn from_str(s: ByteArray) -> TcbStatus;
-}
-
-impl TcbStatusImpl of TcbStatusFromStr {
-    fn from_str(s: ByteArray) -> TcbStatus {
-        if s == "UpToDate" {
-            TcbStatus::OK
-        } else if s == "SWHardeningNeeded" {
-            TcbStatus::TcbSwHardeningNeeded
-        } else if s == "ConfigurationAndSWHardeningNeeded" {
-            TcbStatus::TcbConfigurationAndSwHardeningNeeded
-        } else if s == "ConfigurationNeeded" {
-            TcbStatus::TcbConfigurationNeeded
-        } else if s == "OutOfDate" {
-            TcbStatus::TcbOutOfDate
-        } else if s == "OutOfDateConfigurationNeeded" {
-            TcbStatus::TcbOutOfDateConfigurationNeeded
-        } else if s == "Revoked" {
-            TcbStatus::TcbRevoked
-        } else {
-            TcbStatus::TcbUnrecognized
-        }
-    }
-}
 // // serialization:
 // // [quote_vesion][tee_type][tcb_status][fmspc][quote_body_raw_bytes]
 // // 2 bytes + 4 bytes + 1 byte + 6 bytes + var (SGX_ENCLAVE_REPORT = 384; TD10_REPORT = 584)
@@ -54,8 +19,8 @@ pub struct VerifiedOutput {
     pub tee_type: u32,
     pub tcb_status: TcbStatus,
     pub fmspc: [u8; 6],
-    pub quote_body: QuoteBody,
-    pub advisory_ids: Option<Span<felt252>>,
+    pub quote_body: Span<u8>,
+    pub advisory_ids: Option<Span<u8>>,
 }
 
 //not used todo check

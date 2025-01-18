@@ -2,6 +2,8 @@ use super::asn1_decode::NodePtrTrait;
 use super::byte::ArrayU8ExtTrait;
 use cairo::utils::asn1_decode::Asn1DecodeTrait;
 use cairo::utils::time_decode::TimeDecodeTrait;
+use cairo::types::tcbinfo::TcbStatus;
+use cairo::types::tcbinfo::TCBLevelsObj;
 use cairo::utils::byte::SpanU8TryIntoArrayU8Fixed16;
 use cairo::utils::x509_decode::{X509CertObj, X509DecodeImpl, };
 const SGX_TCB_CPUSVN_SIZE: u32 = 16;
@@ -320,4 +322,37 @@ impl PCKHelperImpl of PCKHelperTrait {
 
         (true, filtered.span(), end_pos + x509_footer.len())
     }
+
+    fn get_sgx_tcb_status(self: PCKCertTCB, current: TCBLevelsObj) -> (bool, TcbStatus) {
+        let mut status = current.status;
+        let mut pce_svn_is_higher_or_greater = self.pcesvn >= current.pcesvn;
+        let mut cpu_svns_are_higher_or_greater = true;
+        let mut i = 0;
+        while i < SGX_TCB_CPUSVN_SIZE {
+            if *self.cpusvns[i] < *current.sgx_component_cpu_svns[i] {
+                cpu_svns_are_higher_or_greater = false;
+                break;
+            }
+            i += 1;
+        };
+        let status_found = pce_svn_is_higher_or_greater && cpu_svns_are_higher_or_greater;
+        if status_found {
+            (true, status)
+        } else {
+            (false, TcbStatus::TcbUnrecognized)
+        }
+    }
+
+//     function getSGXTcbStatus(PCKCertTCB memory pckTcb, TCBLevelsObj memory current)
+//     internal
+//     pure
+//     returns (bool, TCBStatus status)
+// {
+//     bool pceSvnIsHigherOrGreater;
+//     bool cpuSvnsAreHigherOrGreater;
+//     (pceSvnIsHigherOrGreater, cpuSvnsAreHigherOrGreater) = _checkSgxCpuSvns(pckTcb, current);
+//     status = current.status;
+//     bool statusFound = pceSvnIsHigherOrGreater && cpuSvnsAreHigherOrGreater;
+//     return (statusFound, statusFound ? status : TCBStatus.TCB_UNRECOGNIZED);
+// }
 }
