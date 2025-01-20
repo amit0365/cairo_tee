@@ -11,10 +11,10 @@ use crate::types::{
     collaterals::IntelCollateral, VerifiedOutput,
 };
 
-use crate::types::collaterals::IntelCollateralData;
+use crate::types::collaterals::IntelCollateralDataRaw;
 use crate::types::quotes::{QeReportCertDataRaw, CertDataImpl, QeAuthDataImpl};
 use crate::verify::quotes::{common_verify_and_fetch_tcb, converge_tcb_status_with_qe_tcb};
-use crate::utils::byte::{felt252s_to_u8s, u8_to_u16, u8_to_u32, u8s_typed_to_u256, 
+use crate::utils::byte::{felt252s_to_u8s, u8_to_u16_le, u8_to_u32_le, u8s_typed_to_u256, 
     SpanU8TryIntoArrayU8Fixed32, SpanU8TryIntoArrayU8Fixed6, u8s_to_felt252s, felt252s_to_u32, felt252s_to_u16};
 
 // use crate::utils::cert::get_sgx_tdx_fmspc_tcbstatus_v3;
@@ -27,14 +27,14 @@ use crate::utils::byte::{felt252s_to_u8s, u8_to_u16, u8_to_u32, u8s_typed_to_u25
 pub fn verify_quote_dcapv4(
     raw_quote: Span<u8>,
     is_sgx: bool,
-    collaterals: @IntelCollateralData,
-    tcb_data: Span<u8>,
-    current_time: u64,
+    collaterals: @IntelCollateralDataRaw,
+    tcb_data: Option<Span<u8>>,
+    current_time: Option<u64>, // remove option
 ) -> VerifiedOutput {
 
     let mut offset = 0;
-    let quote_header_version = u8_to_u16(raw_quote.slice(0, 2));
-    let quote_header_tee_type = u8_to_u32(raw_quote.slice(4, 4));
+    let quote_header_version = u8_to_u16_le(raw_quote.slice(0, 2));
+    let quote_header_tee_type = u8_to_u32_le(raw_quote.slice(4, 4));
 
     let quote_header = raw_quote.slice(offset, 48);
 
@@ -58,15 +58,15 @@ pub fn verify_quote_dcapv4(
     let quote_pubkey_y = raw_quote.slice(offset, 32);
     offset += 32;
 
-    // assert!(check_quote_header(@quote.header, 4), "invalid quote header");
+    //assert!(check_quote_header(@quote.header, 4), "invalid quote header");
 
     // we'll now proceed to verify the qe
-    let qe_cert_data_v4_type_u16 = felt252s_to_u16(u8s_to_felt252s(raw_quote.slice(offset, 2)).span());
+    let qe_cert_data_v4_type_u16 = u8_to_u16_le(raw_quote.slice(offset, 2));
     offset += 2;
-    let qe_cert_data_v4_len = felt252s_to_u32(u8s_to_felt252s(raw_quote.slice(offset, 4)).span());
+    let qe_cert_data_v4_len = u8_to_u32_le(raw_quote.slice(offset, 4));
     offset += 4;
-    let qe_cert_data_v4 = u8s_to_felt252s(raw_quote.slice(offset, qe_cert_data_v4_len)).span();
-
+    let qe_cert_data_v4 = raw_quote.slice(offset, qe_cert_data_v4_len);
+    
     // right now we just handle type 6, which contains the QEReport, QEReportSignature, QEAuthData and another CertData
     let qe_report_cert_data = if qe_cert_data_v4_type_u16 == 6 {
         QeReportCertDataImpl::from_bytes(qe_cert_data_v4)
@@ -89,11 +89,11 @@ pub fn verify_quote_dcapv4(
     );
 
     // Verify Step 2: Check TCBStatus against isvs in the SGXComponent of the matching tcblevel
-    let tcb_info_v3 = if let TcbInfo::V3(tcb) = tcb_info {
-        tcb
-    } else {
-        panic!("TcbInfo must be V3!")
-    };
+    // let tcb_info_v3 = if let TcbInfo::V3(tcb) = tcb_info {
+    //     tcb
+    // } else {
+    //     panic!("TcbInfo must be V3!")
+    // };
 
     let (quote_tdx_body, tee_tcb_svn) = if !is_sgx {
         (Option::Some(quote_body), quote_body.slice(0, 16))
@@ -106,8 +106,9 @@ pub fn verify_quote_dcapv4(
     // let (sgx_tcb_status, tdx_tcb_status, advisory_ids) =
     // get_sgx_tdx_fmspc_tcbstatus_v3(tee_type, @sgx_extensions, @tee_tcb_svn, @tcb_info_v3);
     
-    let tcb_levels = TCBLevelsObjImpl::from_bytes(tcb_data); // get tcb levels from pccs
-    let (sgx_tcb_status_found, sgx_tcb_status) = sgx_extensions.get_sgx_tcb_status(tcb_levels); // only handle SGX for now
+    // todo
+    // let tcb_levels = TCBLevelsObjImpl::from_bytes(tcb_data); // get tcb levels from pccs
+    // let (sgx_tcb_status_found, sgx_tcb_status) = sgx_extensions.get_sgx_tcb_status(tcb_levels); // only handle SGX for now
 
 //     assert!(
 //         sgx_tcb_status != TcbStatus::TcbRevoked || tdx_tcb_status != TcbStatus::TcbRevoked,
@@ -146,15 +147,16 @@ pub fn verify_quote_dcapv4(
 //         tcb_status = converge_tcb_status_with_tdx_module_tcb(tcb_status, tdx_module_tcb_status)
 //     }
 
-// Verify Step 3: Converge QEIdentity and FMSPC TCB Status
-    let tcb_status = converge_tcb_status_with_qe_tcb(sgx_tcb_status, qe_tcb_status);
+    // todo
+    // Verify Step 3: Converge QEIdentity and FMSPC TCB Status
+    // let tcb_status = converge_tcb_status_with_qe_tcb(sgx_tcb_status, qe_tcb_status);
 
     VerifiedOutput {
         quote_version: quote_header_version,
         tee_type: quote_header_tee_type,
-        tcb_status,
+        tcb_status: Option::None,
         fmspc: sgx_extensions.fmspc_bytes.try_into().unwrap(),
         quote_body: quote_body,
-        advisory_ids: Option::Some(tcb_levels.advisory_ids)
+        advisory_ids: Option::None //Option::Some(tcb_levels.advisory_ids)
     }
 }

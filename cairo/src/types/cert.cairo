@@ -1,8 +1,10 @@
 use starknet::secp256_trait::Signature;
 // use x509_parser::{certificate::X509Certificate, revocation_list::CertificateRevocationList};
 // use crate::utils::cert::{get_crl_uri, is_cert_revoked, parse_x509_der_multi, pem_to_der};
-use super::collaterals::IntelCollateralData;
+use super::collaterals::{IntelCollateralData, IntelCollateralDataRaw, IntelCollateralDataTrait};
 use crate::utils::x509_decode::X509CertObj;
+use crate::utils::x509crl_decode::{X509CRLObj, X509CRLDecodeTrait};
+
 // #[derive(Default, Debug)]
 pub struct SgxExtensionTcbLevel {
     pub sgxtcbcomp01svn: u8,
@@ -53,18 +55,18 @@ pub struct CertificateRevocationList {
 
 #[derive(Drop, Copy)]
 pub struct IntelSgxCrls {
-    pub sgx_root_ca_crl: @Option<CertificateRevocationList>,
-    pub sgx_pck_processor_crl: @Option<CertificateRevocationList>,
-    pub sgx_pck_platform_crl: @Option<CertificateRevocationList>,
+    pub sgx_root_ca_crl: Option<X509CRLObj>,
+    pub sgx_pck_processor_crl: Option<X509CRLObj>,
+    pub sgx_pck_platform_crl: Option<X509CRLObj>,
 }
 
 #[generate_trait]
 impl IntelSgxCrlsImpl of IntelSgxCrlsTrait {
-    fn from_collaterals(collaterals: @IntelCollateralData) -> IntelSgxCrls {
+    fn from_collaterals(collaterals: @IntelCollateralDataRaw) -> IntelSgxCrls {
         IntelSgxCrls {
-            sgx_root_ca_crl: collaterals.sgx_intel_root_ca_crl,
-            sgx_pck_processor_crl: collaterals.sgx_pck_processor_crl,
-            sgx_pck_platform_crl: collaterals.sgx_pck_platform_crl,
+            sgx_pck_processor_crl: collaterals.get_sgx_pck_processor_crl(),
+            sgx_pck_platform_crl: collaterals.get_sgx_pck_platform_crl(),
+            sgx_root_ca_crl: collaterals.get_sgx_intel_root_ca_crl(),
         }
     }
 

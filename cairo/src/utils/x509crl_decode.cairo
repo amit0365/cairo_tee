@@ -1,4 +1,5 @@
-use cairo::utils::asn1_decode::Asn1DecodeTrait;
+use super::byte::ArrayU8ExtTrait;
+use cairo::utils::asn1_decode::{Asn1DecodeTrait, NodePtrTrait};
 use cairo::utils::time_decode::TimeDecodeTrait;
 
 
@@ -19,7 +20,6 @@ impl X509HelperImpl of X509HelperTrait {
         let root = self.root();
         let tbs_parent_ptr = self.first_child_of(root);
         let tbs_ptr = self.first_child_of(tbs_parent_ptr);
-        let tbs_ptr = self.next_sibling_of(tbs_ptr);
         self.bytes_at(tbs_ptr).parse_serial_number()
     }
 
@@ -29,44 +29,32 @@ impl X509HelperImpl of X509HelperTrait {
         let tbs_ptr = self.first_child_of(tbs_parent_ptr);
         let tbs_ptr = self.next_sibling_of(tbs_ptr);
         let tbs_ptr = self.next_sibling_of(tbs_ptr);
-        let tbs_ptr = self.next_sibling_of(tbs_ptr);
         self.get_common_name(self.first_child_of(tbs_ptr))
     }
 
-    fn get_cert_validity(self: Span<u8>) -> (u32, u32) {
+    
+    fn crl_is_not_expired(self: Span<u8>, current_time: u32) -> bool {
         let root = self.root();
         let tbs_parent_ptr = self.first_child_of(root);
-        let tbs_ptr = self.first_child_of(tbs_parent_ptr);
-        let tbs_ptr = self.next_sibling_of(tbs_ptr);
-        let tbs_ptr = self.next_sibling_of(tbs_ptr);
-        let tbs_ptr = self.next_sibling_of(tbs_ptr);
-        let tbs_ptr = self.next_sibling_of(tbs_ptr);
-        self.get_validity(tbs_ptr)
+        let mut tbs_ptr = self.first_child_of(tbs_parent_ptr);
+        tbs_ptr = self.next_sibling_of(tbs_ptr);
+        tbs_ptr = self.next_sibling_of(tbs_ptr);
+        tbs_ptr = self.next_sibling_of(tbs_ptr);
+        let (validity_not_before, validity_not_after) = self.get_validity(tbs_ptr);
+        current_time > validity_not_before && current_time < validity_not_after
     }
 
-    fn get_subject_common_name(self: Span<u8>) -> Span<u8> {
+    fn serial_number_is_revoked(self: Span<u8>, serial_number: felt252) -> bool {
         let root = self.root();
         let tbs_parent_ptr = self.first_child_of(root);
-        let tbs_ptr = self.first_child_of(tbs_parent_ptr);
-        let tbs_ptr = self.next_sibling_of(tbs_ptr);
-        let tbs_ptr = self.next_sibling_of(tbs_ptr);
-        let tbs_ptr = self.next_sibling_of(tbs_ptr);
-        let tbs_ptr = self.next_sibling_of(tbs_ptr);
-        let tbs_ptr = self.next_sibling_of(tbs_ptr);
-        self.get_common_name(self.first_child_of(tbs_ptr))
-    }
-
-    fn get_subject_public_key(self: Span<u8>) -> (Span<u8>, Span<u8>) {
-        let root = self.root();
-        let tbs_parent_ptr = self.first_child_of(root);
-        let tbs_ptr = self.first_child_of(tbs_parent_ptr);
-        let tbs_ptr = self.next_sibling_of(tbs_ptr);
-        let tbs_ptr = self.next_sibling_of(tbs_ptr);
-        let tbs_ptr = self.next_sibling_of(tbs_ptr);
-        let tbs_ptr = self.next_sibling_of(tbs_ptr);
-        let tbs_ptr = self.next_sibling_of(tbs_ptr);
-        let tbs_ptr = self.next_sibling_of(tbs_ptr);
-        self.get_subject_pki(self.first_child_of(tbs_ptr))
+        let mut tbs_ptr = self.first_child_of(tbs_parent_ptr);
+        tbs_ptr = self.next_sibling_of(tbs_ptr);
+        tbs_ptr = self.next_sibling_of(tbs_ptr);
+        tbs_ptr = self.next_sibling_of(tbs_ptr);
+        tbs_ptr = self.next_sibling_of(tbs_ptr);
+        tbs_ptr = self.next_sibling_of(tbs_ptr);
+        let revoked_numbers = self.get_revoked_serial_numbers(tbs_ptr, true, serial_number);
+        revoked_numbers.len() == 1 && *revoked_numbers.at(0) == serial_number
     }
 
     fn get_common_name(self: Span<u8>, common_name_parent_ptr: u256) -> Span<u8> {
@@ -84,11 +72,42 @@ impl X509HelperImpl of X509HelperTrait {
         (not_before, not_after)
     }
 
-    fn get_subject_pki(self: Span<u8>, subject_public_key_info_ptr: u256) -> (Span<u8>, Span<u8>) {
-        let subject_public_key_info_ptr = self.next_sibling_of(subject_public_key_info_ptr);
-        let pub_key = self.bitstring_at(subject_public_key_info_ptr);
-        assert(pub_key.len() == 65, 'compressed key not supported');
-        (pub_key.slice(1, 32), pub_key.slice(33, 32))
+    fn get_revoked_serial_numbers(
+        self: Span<u8>, 
+        revoked_parent_ptr: u256, 
+        break_if_found: bool, 
+        filter: felt252
+    ) -> Array<felt252> {
+        let CRL_NUMBER_OID: ByteArray = "551d14";
+        let mut serial_numbers = ArrayTrait::new();
+        let mut revoked_ptr = self.first_child_of(revoked_parent_ptr);
+
+        // Check if it's a CRL extension
+        if *self.at(revoked_ptr.ixs().try_into().unwrap()) == 0xA0 {
+            let crl_extension_ptr = self.first_child_of(revoked_ptr);
+            assert(self.bytes_at(crl_extension_ptr).into_byte_array() == CRL_NUMBER_OID, 'invalid CRL');
+        } else {
+            // Process revoked certificates
+            loop {
+                if revoked_ptr.ixl() > revoked_parent_ptr.ixl() {
+                    break;
+                }
+
+                let serial_ptr = self.first_child_of(revoked_ptr);
+                let serial_bytes = self.bytes_at(serial_ptr);
+                let serial_number = serial_bytes.parse_serial_number();
+
+                if break_if_found && filter == serial_number {
+                    serial_numbers.append(filter);
+                    break;
+                }
+
+                serial_numbers.append(serial_number);
+                revoked_ptr = self.next_sibling_of(revoked_ptr);
+            };
+        }
+
+        serial_numbers
     }
 
     fn parse_serial_number(self: Span<u8>) -> felt252 {
@@ -147,87 +166,76 @@ impl X509HelperImpl of X509HelperTrait {
 }
 
 #[derive(Drop, Copy)]
-pub struct X509CertObj {
+pub struct X509CRLObj {
     tbs: Span<u8>,
     serial_number: felt252,
     issuer_common_name: Span<u8>,
     validity_not_before: u32,
     validity_not_after: u32,
-    subject_common_name: Span<u8>,
-    subject_public_key: (Span<u8>, Span<u8>),
-    signature: (Span<u8>, Span<u8>),  // (r, s)
-    extension_ptr: u256,
+    revoked_serials: Span<felt252>,
+    signature: (Span<u8>, Span<u8>), // (r, s)
 }
 
-// x509 Certificates generally contain a sequence of elements in the following order:
-// 1. tbs
-// - 1a. version
-// - 1b. serial number
-// - 1c. siganture algorithm
-// - 1d. issuer
-// - - 1d(a). common name
-// - - 1d(b). organization name
-// - - 1d(c). locality name
-// - - 1d(d). state or province name
-// - - 1d(e). country name
-// - 1e. validity
-// - - 1e(a) notBefore
-// - - 1e(b) notAfter
-// - 1f. subject
-// - - contains the same set of elements as 1d
-// - 1g. subject public key info
-// - - 1g(a). algorithm
-// - - 1g(b). subject public key
-// - 1h. Extensions
-// 2. Signature Algorithm
-// 3. Signature
+/// x509 CRL generally contain a sequence of elements in the following order:
+/// 1. tbs
+/// - 1a. serial number
+/// - 1b. signature algorithm
+/// - 1c. issuer
+/// - - 1c(a). common name
+/// - - 1c(b). organization name
+/// - - 1c(c). locality name
+/// - - 1c(d). state or province name
+/// - - 1c(e). country name
+/// - 1d. not before
+/// - 1e. not after
+/// - 1f. revoked certificates
+/// - - A list consists of revoked serial numbers and reasons.
+/// - 1g. CRL extensions
+/// - - 1g(a) CRL number
+/// - - 1g(b) Authority Key Identifier
+/// 2. Signature Algorithm
+/// 3. Signature
 #[generate_trait]
-impl X509DecodeImpl of X509DecodeTrait {
-    fn default() -> X509CertObj {
-        X509CertObj { tbs: array![].span(), serial_number: 0, issuer_common_name: array![].span(), validity_not_before: 0, validity_not_after: 0, subject_common_name: array![].span(), subject_public_key: (array![].span(), array![].span()), signature: (array![].span(), array![].span()), extension_ptr: 0 }
+impl X509CRLDecodeImpl of X509CRLDecodeTrait {
+    fn default() -> X509CRLObj {
+        X509CRLObj { tbs: array![].span(), serial_number: 0, issuer_common_name: array![].span(), validity_not_before: 0, validity_not_after: 0, revoked_serials: array![].span(), signature: (array![].span(), array![].span()) }
     }
 
-    fn parse_x509_der(self: Span<u8>) -> X509CertObj {
+    fn parse_crl_der(self: Span<u8>) -> X509CRLObj {
         let root = self.root();
-
+        println!("root crl: {}", root);
         let tbs_parent_ptr = self.first_child_of(root);
         let tbs = self.all_bytes_at(tbs_parent_ptr);
-
+        println!("tbs crl: {}", tbs.len());
         let mut tbs_ptr = self.first_child_of(tbs_parent_ptr);
-        tbs_ptr = self.next_sibling_of(tbs_ptr);
-        
         let serial_number = self.bytes_at(tbs_ptr).parse_serial_number();
+        println!("serial_number crl: {}", serial_number);
         
         tbs_ptr = self.next_sibling_of(tbs_ptr);
         tbs_ptr = self.next_sibling_of(tbs_ptr);
         
         let issuer_common_name = self.get_common_name(self.first_child_of(tbs_ptr));
-
-        tbs_ptr = self.next_sibling_of(tbs_ptr);
-        let (validity_not_before, validity_not_after) = self.get_validity(tbs_ptr);
-
-        tbs_ptr = self.next_sibling_of(tbs_ptr);
-        let subject_common_name = self.get_common_name(self.first_child_of(tbs_ptr));
         
         tbs_ptr = self.next_sibling_of(tbs_ptr);
-        let subject_public_key = self.get_subject_pki(self.first_child_of(tbs_ptr));
+        let (validity_not_before, validity_not_after) = self.get_validity(tbs_ptr);
+        
+        tbs_ptr = self.next_sibling_of(tbs_ptr);        
+        tbs_ptr = self.next_sibling_of(tbs_ptr);
 
-        let extension_ptr = self.next_sibling_of(tbs_ptr);
+        let revoked_serials = self.get_revoked_serial_numbers(tbs_ptr, false, 0).span();
         
         let sig_ptr = self.next_sibling_of(tbs_parent_ptr);
         let sig_ptr = self.next_sibling_of(sig_ptr);
         let signature = self.get_signature(sig_ptr);
         
-        X509CertObj {
+        X509CRLObj {
             tbs,
             serial_number,
             issuer_common_name,
             validity_not_before,
             validity_not_after,
-            subject_common_name,
-            subject_public_key,
+            revoked_serials,
             signature,
-            extension_ptr,
         }
     }
 }

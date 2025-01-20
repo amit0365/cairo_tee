@@ -2,10 +2,10 @@ use crate::types::{enclave_identity::EnclaveIdentityV2, TcbStatus, quotes::body:
 use crate::verify::crypto::verify_p256_signature;
 use crate::types::cert::X509CertificateData;
 use crate::utils::x509_decode::X509CertObj;
-use core::sha256::compute_sha256_byte_array;
 use crate::types::tcbinfo::TcbStatusImpl;
 use super::super::utils::byte::ArrayU8ExtTrait;
 use crate::utils::byte::{felt252s_to_u8s, u32s_typed_to_u256, SpanU8TryIntoU256};
+use crate::verify::cert::sha256_as_u256;
 
 pub fn validate_enclave_identityv2(enclave_identityv2: @EnclaveIdentityV2, sgx_signing_cert: @X509CertObj, current_time: u64) -> bool {
     // get tcb_info_root time
@@ -27,7 +27,7 @@ pub fn validate_enclave_identityv2(enclave_identityv2: @EnclaveIdentityV2, sgx_s
     let public_key_x = @SpanU8TryIntoU256::try_into(public_key_x.deref()).unwrap();
     let public_key_y = @SpanU8TryIntoU256::try_into(public_key_y.deref()).unwrap();
     let enclave_identityv2_signature_data_u8s = felt252s_to_u8s(enclave_identityv2_signature_data.span()).into_byte_array(); 
-    let enclave_identityv2_signature_data_hash: u256 = u32s_typed_to_u256(@compute_sha256_byte_array(@enclave_identityv2_signature_data_u8s));
+    let enclave_identityv2_signature_data_hash: u256 = sha256_as_u256(enclave_identityv2_signature_data_u8s);
     verify_p256_signature(enclave_identityv2_signature_data_hash, (public_key_x, public_key_y), enclave_identityv2.signature.r, enclave_identityv2.signature.s)
 }
 

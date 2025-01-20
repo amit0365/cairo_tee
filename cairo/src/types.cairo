@@ -13,11 +13,11 @@ use crate::constants::{ENCLAVE_REPORT_LEN, SGX_TEE_TYPE, TD10_REPORT_LEN, TDX_TE
 // // [quote_vesion][tee_type][tcb_status][fmspc][quote_body_raw_bytes]
 // // 2 bytes + 4 bytes + 1 byte + 6 bytes + var (SGX_ENCLAVE_REPORT = 384; TD10_REPORT = 584)
 // // total: 13 + var bytes
-// #[derive(Debug)]
+#[derive(Drop)]
 pub struct VerifiedOutput {
     pub quote_version: u16,
     pub tee_type: u32,
-    pub tcb_status: TcbStatus,
+    pub tcb_status: Option<TcbStatus>, //remove option
     pub fmspc: [u8; 6],
     pub quote_body: Span<u8>,
     pub advisory_ids: Option<Span<u8>>,

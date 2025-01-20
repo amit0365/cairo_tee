@@ -3,7 +3,7 @@ pub mod header;
 pub mod version_4;
 
 use cairo::types::cert::Certificates;
-use cairo::utils::byte::{felt252s_to_u16, felt252s_to_u8s, felt252s_to_u32, SpanU8TryIntoArrayU8Fixed64};
+use cairo::utils::byte::{felt252s_to_u16, u8_to_u16_le, u8_to_u32_le, felt252s_to_u8s, felt252s_to_u32, SpanU8TryIntoArrayU8Fixed64};
 use cairo::types::quotes::body::EnclaveReportImpl;
 use cairo::types::quotes::body::EnclaveReport;
 
@@ -31,15 +31,12 @@ pub struct CertData {
                                         // 7: PLATFORM_MANIFEST
 }
 
-trait CertDataFromBytes {
-    fn from_bytes(raw_bytes: Span<felt252>) -> CertData;
-}
-
+#[generate_trait]
 impl CertDataImpl of CertDataFromBytes {
-    fn from_bytes(raw_bytes: Span<felt252>) -> CertData {
-        let cert_data_type = felt252s_to_u16(raw_bytes.slice(0, 2));
-        let cert_data_size = felt252s_to_u32(raw_bytes.slice(2, 4));
-        let cert_data = felt252s_to_u8s(raw_bytes.slice(6, cert_data_size));
+    fn from_bytes(raw_bytes: Span<u8>) -> CertData {
+        let cert_data_type = u8_to_u16_le(raw_bytes.slice(0, 2));
+        let cert_data_size = u8_to_u32_le(raw_bytes.slice(2, 4));
+        let cert_data = raw_bytes.slice(6, cert_data_size);
 
         CertData {
             cert_data_type,
@@ -82,15 +79,12 @@ pub struct QeAuthData {
     pub data: Span<u8>,
 }
 
-trait QeAuthDataFromBytes {
-    fn from_bytes(raw_bytes: Span<felt252>) -> QeAuthData;
-}
-
+#[generate_trait]
 impl QeAuthDataImpl of QeAuthDataFromBytes {
-    fn from_bytes(raw_bytes: Span<felt252>) -> QeAuthData {
-        let size = felt252s_to_u16(raw_bytes.slice(0, 2));
+    fn from_bytes(raw_bytes: Span<u8>) -> QeAuthData {
+        let size = u8_to_u16_le(raw_bytes.slice(0, 2));
         let size_u32 = size.try_into().unwrap();
-        let data = felt252s_to_u8s(raw_bytes.slice(2, size_u32));
+        let data = raw_bytes.slice(2, size_u32);
         QeAuthData {
             size,
             data,
@@ -98,16 +92,14 @@ impl QeAuthDataImpl of QeAuthDataFromBytes {
     }
 }
 
-trait QeReportCertDataFromBytes {
-    fn from_bytes(raw_bytes: Span<felt252>) -> QeReportCertData;
-}
 
+#[generate_trait]
 impl QeReportCertDataImpl of QeReportCertDataFromBytes {
-    fn from_bytes(raw_bytes: Span<felt252>) -> QeReportCertData {
+    fn from_bytes(raw_bytes: Span<u8>) -> QeReportCertData {
         // 384 bytes for qe_report
         let qe_report = EnclaveReportImpl::from_bytes(raw_bytes.slice(0, 384));
         // 64 bytes for qe_report_signature
-        let qe_report_signature = felt252s_to_u8s(raw_bytes.slice(384, 64)).try_into().unwrap();
+        let qe_report_signature = raw_bytes.slice(384, 64).try_into().unwrap();
         // qe auth data is variable length, we'll pass remaining bytes to the from_bytes method
         let qe_auth_data = QeAuthDataImpl::from_bytes(raw_bytes.slice(448, raw_bytes.len() - 448));
         // get the length of qe_auth_data

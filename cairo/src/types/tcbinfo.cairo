@@ -1,6 +1,6 @@
 use core::starknet::secp256_trait::Signature;
 use crate::types::collaterals::TcbInfo;
-use crate::utils::byte::{u8_to_u16, u8_to_u64, ArrayU8Ext};
+use crate::utils::byte::{u8_to_u16_le, u8_to_u64, ArrayU8Ext};
 
 pub enum TcbId {
     /// the "id" field is absent from TCBInfo V2
@@ -62,7 +62,7 @@ pub struct TCBLevelsObj {
 impl TCBLevelsObjImpl of TCBLevelsObjTrait {
     fn from_bytes(bytes: Span<u8>) -> TCBLevelsObj {
         let mut offset = 0;
-        let pcesvn = u8_to_u16(bytes.slice(offset, 2));
+        let pcesvn = u8_to_u16_le(bytes.slice(offset, 2)); //todo check if this is le
         offset += 2;
         let sgx_component_cpu_svns = bytes.slice(offset, 16);
         offset += 16;

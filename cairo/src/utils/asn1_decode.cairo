@@ -1,8 +1,11 @@
+use integer::{u128_byte_reverse, u256_safe_div_rem, u256_as_non_zero};
+use cairo::utils::byte::{read_bytes_n, pow_256};
+
 #[generate_trait]
 impl NodePtrImpl of NodePtrTrait {
     // Unpack first byte index
     fn ixs(self: u256) -> u256 {
-        self & 0xFFFFFFFFFFFFFFFFFFFF_u256 // First 80 bits
+        self & 0xFFFFFFFFFFFFFFFFFFFF // First 80 bits
     }
 
     // Unpack first content byte index 
@@ -112,31 +115,36 @@ impl Asn1DecodeImpl of Asn1DecodeTrait {
     // Read the length of an ASN1 node at a given offset
     fn read_node_length(self: Span<u8>, offset: u256) -> u256 {
         let ixs = offset;
-        let ixf = offset + 1;
-        let index = ixf.try_into().unwrap();
+        let index = (ixs + 1).try_into().unwrap();
         let length_byte = *self.at(index);
+    
+        let mut ix_first_content_byte = 0;
+        let mut ix_last_content_byte = 0;
 
-        let mut ixl = 0;
         if length_byte & 0x80 == 0 {
             // Short form
-            ixl = ixf + length_byte.into();
+            let length = length_byte;
+            ix_first_content_byte = ixs + 2;  // ix + 2 in Solidity
+            ix_last_content_byte = ix_first_content_byte + length.into() - 1;
         } else {
             // Long form
             let length_bytes = length_byte & 0x7f;
             let mut length: u256 = 0;
-            let mut i: u8 = 0;
-            loop {
-                if i >= length_bytes {
-                    break;
-                }
-                let byte_index = (ixf + 1 + i.into()).try_into().unwrap();
-                length = length * 256 + (*self.at(byte_index)).into();
-                i += 1;
-            };
-            ixl = ixf + 1 + length_bytes.into() + length;
-        };
 
-        NodePtrTrait::get_ptr(ixs, ixf, ixl)
+            if length_bytes == 1 {
+                length = (*self.at((ixs + 2).try_into().unwrap())).try_into().unwrap();
+            } else if length_bytes == 2 {
+                length = (*self.at((ixs + 2).try_into().unwrap())).try_into().unwrap() * 256 + (*self.at((ixs + 3).try_into().unwrap())).try_into().unwrap();
+            } else {
+                let denominator = pow_256(((32 - length_bytes) * 8).into());
+                length = read_bytes_n(self, ixs + 2, length_bytes) / denominator;
+            }
+
+            ix_first_content_byte = ixs + 2 + length_bytes.into();
+            ix_last_content_byte = ix_first_content_byte + length - 1;
+        };
+    
+        NodePtrTrait::get_ptr(ixs, ix_first_content_byte, ix_last_content_byte)
     }
 
     // Extract value of a bit string node from DER-encoded structure

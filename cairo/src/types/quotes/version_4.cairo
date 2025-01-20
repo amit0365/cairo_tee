@@ -34,56 +34,54 @@ pub struct QuoteSignatureDataV4 {
                                         // QE Cert Data
 }
 
-trait QuoteSignatureDataV4FromBytes {
-    fn from_bytes(raw_bytes: Span<felt252>) -> QuoteSignatureDataV4;
-}
+// trait QuoteSignatureDataV4FromBytes {
+//     fn from_bytes(raw_bytes: Span<felt252>) -> QuoteSignatureDataV4;
+// }
 
-impl QuoteSignatureDataV4Impl of QuoteSignatureDataV4FromBytes {
-    fn from_bytes(raw_bytes: Span<felt252>) -> QuoteSignatureDataV4 {
-        let quote_signature = felt252s_to_u8s(raw_bytes.slice(0, 64)).try_into().unwrap();
-        let ecdsa_attestation_key = felt252s_to_u8s(raw_bytes.slice(64, 64)).try_into().unwrap();
-        let qe_cert_data = CertDataImpl::from_bytes(raw_bytes.slice(128, 128));
+// impl QuoteSignatureDataV4Impl of QuoteSignatureDataV4FromBytes {
+//     fn from_bytes(raw_bytes: Span<felt252>) -> QuoteSignatureDataV4 {
+//         let quote_signature = felt252s_to_u8s(raw_bytes.slice(0, 64)).try_into().unwrap();
+//         let ecdsa_attestation_key = felt252s_to_u8s(raw_bytes.slice(64, 64)).try_into().unwrap();
+//         let qe_cert_data = CertDataImpl::from_bytes(raw_bytes.slice(128, 128));
 
-        QuoteSignatureDataV4 {
-            quote_signature,
-            ecdsa_attestation_key,
-            qe_cert_data,
-        }
-    }
-}
+//         QuoteSignatureDataV4 {
+//             quote_signature,
+//             ecdsa_attestation_key,
+//             qe_cert_data,
+//         }
+//     }
+// }
 
-trait QuoteV4FromBytes {
-    fn from_bytes(raw_bytes: Span<felt252>) -> QuoteV4;
-}
 
-impl QuoteV4Impl of QuoteV4FromBytes {
-    fn from_bytes(raw_bytes: Span<felt252>) -> QuoteV4 {
-        let header = QuoteHeaderImpl::from_bytes(raw_bytes.slice(0, 48));
-        let mut offset: usize = 48;
+// #[generate_trait]
+// impl QuoteV4Impl of QuoteV4FromBytes {
+//     fn from_bytes(raw_bytes: Span<u8>) -> QuoteV4 {
+//         let header = QuoteHeaderImpl::from_bytes(raw_bytes.slice(0, 48));
+//         let mut offset: usize = 48;
 
-        let quote_body = if header.tee_type == SGX_TEE_TYPE {
-            offset += ENCLAVE_REPORT_LEN;
-                QuoteBody::SGXQuoteBody(EnclaveReportImpl::from_bytes(raw_bytes.slice(48, offset - 48)))
-        } else if header.tee_type == TDX_TEE_TYPE {
-            offset += TD10_REPORT_LEN;
-            QuoteBody::TD10QuoteBody(TD10ReportBodyImpl::from_bytes(raw_bytes.slice(48, offset - 48)))
-        } else {
-            panic!("Unknown TEE type")
-        };
+//         let quote_body = if header.tee_type == SGX_TEE_TYPE {
+//             offset += ENCLAVE_REPORT_LEN;
+//                 QuoteBody::SGXQuoteBody(EnclaveReportImpl::from_bytes(raw_bytes.slice(48, offset - 48)))
+//         } else if header.tee_type == TDX_TEE_TYPE {
+//             offset += TD10_REPORT_LEN;
+//             QuoteBody::TD10QuoteBody(TD10ReportBodyImpl::from_bytes(raw_bytes.slice(48, offset - 48)))
+//         } else {
+//             panic!("Unknown TEE type")
+//         };
 
-        let signature_len = felt252s_to_u32(raw_bytes.slice(offset, 4));
-        offset += 4;
-        let signature_slice = raw_bytes.slice(offset, signature_len);
-        let signature = QuoteSignatureDataV4Impl::from_bytes(signature_slice);
+//         let signature_len = felt252s_to_u32(raw_bytes.slice(offset, 4));
+//         offset += 4;
+//         let signature_slice = raw_bytes.slice(offset, signature_len);
+//         let signature = QuoteSignatureDataV4Impl::from_bytes(signature_slice);
 
-        QuoteV4 {
-            header,
-            quote_body,
-            signature_len,
-            signature,
-        }
-    }
-}
+//         QuoteV4 {
+//             header,
+//             quote_body,
+//             signature_len,
+//             signature,
+//         }
+//     }
+// }
 
 //     pub fn get_cert_data(&self) -> CertDataType {
 //         match self.cert_data_type {

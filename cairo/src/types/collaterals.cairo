@@ -3,7 +3,9 @@
 use crate::types::cert::{X509CertificateData, CertificateRevocationList};
 use super::enclave_identity::EnclaveIdentityV2;
 use super::tcbinfo::{TcbInfoV2, TcbInfoV3};
-use cairo::utils::x509_decode::X509CertObj;
+use cairo::utils::x509_decode::{X509CertObj, X509DecodeTrait};
+use cairo::utils::x509crl_decode::{X509CRLObj, X509CRLDecodeTrait};
+use crate::utils::byte::{u8_to_u32_le, SpanU8TryIntoArrayU8Fixed32};
 
 #[derive(Clone, Debug)]
 pub struct IntelCollateral {
@@ -35,32 +37,20 @@ pub struct IntelCollateralData {
     pub sgx_pck_platform_crl: Option<CertificateRevocationList>,
 }
 
-// pub struct IntelCollateralDataV2 {
-//     pub tcbinfo: TcbInfoV2,
-//     pub qeidentity: EnclaveIdentityV2,
-//     pub sgx_intel_root_ca: X509CertificateData,
-//     pub sgx_tcb_signing: X509CertificateData,
-//     pub sgx_pck_certchain: Span<X509CertificateData>,
-//     pub sgx_intel_root_ca_crl: Option<CertificateRevocationList>,
-//     pub sgx_pck_processor_crl: Option<CertificateRevocationList>,
-//     pub sgx_pck_platform_crl: Option<CertificateRevocationList>,
-// }
+#[derive(Drop)]
+pub struct IntelCollateralDataRaw {
+    pub tcbinfo_bytes: Option<Span<u8>>,
+    pub qeidentity_bytes: Option<Span<u8>>,
+    pub sgx_intel_root_ca_der: Option<Span<u8>>,
+    pub sgx_tcb_signing_der: Option<Span<u8>>,
+    pub sgx_pck_certchain_der: Option<Span<u8>>,
+    pub sgx_intel_root_ca_crl_der: Option<Span<u8>>,
+    pub sgx_pck_processor_crl_der: Option<Span<u8>>,
+    pub sgx_pck_platform_crl_der: Option<Span<u8>>,
+}
 
-// builder pattern for IntelCollateralV3
-// impl IntelCollateral {
-//     pub fn new() -> IntelCollateral {
-//         IntelCollateral {
-//             tcbinfo_bytes: None,
-//             qeidentity_bytes: None,
-//             sgx_intel_root_ca_der: None,
-//             sgx_tcb_signing_der: None,
-//             sgx_pck_certchain_der: None,
-//             sgx_intel_root_ca_crl_der: None,
-//             sgx_pck_processor_crl_der: None,
-//             sgx_pck_platform_crl_der: None,
-//         }
-//     }
-
+#[generate_trait]
+impl IntelCollateralDataImpl of IntelCollateralDataTrait {
 //     pub fn to_bytes(&self) -> Vec<u8> {
 //         // serialization scheme is simple: the bytestream is made of 2 parts 
 //         // the first contains a u32 length for each of the members
@@ -133,80 +123,89 @@ pub struct IntelCollateralData {
 //         data
 //     }
 
-//     pub fn from_bytes(slice: &[u8]) -> Self {
-//         // reverse the serialization process
-//         // each length is 4 bytes long, we have a total of 8 members
-//         let tcbinfo_bytes_len = u32::from_le_bytes(slice[0..4].try_into().unwrap()) as usize;
-//         let qeidentity_bytes_len = u32::from_le_bytes(slice[4..8].try_into().unwrap()) as usize;
-//         let sgx_intel_root_ca_der_len = u32::from_le_bytes(slice[8..12].try_into().unwrap()) as usize;
-//         let sgx_tcb_signing_der_len = u32::from_le_bytes(slice[12..16].try_into().unwrap()) as usize;
-//         let sgx_pck_certchain_der_len = u32::from_le_bytes(slice[16..20].try_into().unwrap()) as usize;
-//         let sgx_intel_root_ca_crl_der_len = u32::from_le_bytes(slice[20..24].try_into().unwrap()) as usize;
-//         let sgx_pck_processor_crl_der_len = u32::from_le_bytes(slice[24..28].try_into().unwrap()) as usize;
-//         let sgx_pck_platform_crl_der_len = u32::from_le_bytes(slice[28..32].try_into().unwrap()) as usize;
+    fn from_bytes(bytes: Span<u8>) -> IntelCollateralDataRaw {
+        // reverse the serialization process
+        // each length is 4 bytes long, we have a total of 8 members
+        let tcbinfo_bytes_len = u8_to_u32_le(bytes.slice(0, 4));
+        let qeidentity_bytes_len = u8_to_u32_le(bytes.slice(4, 4));
+        let sgx_intel_root_ca_der_len = u8_to_u32_le(bytes.slice(8, 4));
+        let sgx_tcb_signing_der_len = u8_to_u32_le(bytes.slice(12, 4));
+        let sgx_pck_certchain_der_len = u8_to_u32_le(bytes.slice(16, 4));
+        let sgx_intel_root_ca_crl_der_len = u8_to_u32_le(bytes.slice(20, 4));
+        let sgx_pck_processor_crl_der_len = u8_to_u32_le(bytes.slice(24, 4));
+        let sgx_pck_platform_crl_der_len = u8_to_u32_le(bytes.slice(28, 4));
 
-//         let mut offset = 4 * 8 as usize;
-//         let tcbinfo_bytes: Option<Vec<u8>> = match tcbinfo_bytes_len {
-//             0 => None,
-//             len => Some(slice[offset..offset + len].to_vec())
-//         };
-//         offset += tcbinfo_bytes_len;
+        let mut offset = 4 * 8;
+        let tcbinfo_bytes: Option<Span<u8>> = if tcbinfo_bytes_len == 0 {
+            Option::None
+        } else {
+            Option::Some(bytes.slice(offset, tcbinfo_bytes_len))
+        };
+        offset += tcbinfo_bytes_len;
 
-//         let qeidentity_bytes: Option<Vec<u8>> = match qeidentity_bytes_len {
-//             0 => None,
-//             len => Some(slice[offset..offset + len].to_vec())
-//         };
-//         offset += qeidentity_bytes_len;
+        let qeidentity_bytes: Option<Span<u8>> = if qeidentity_bytes_len == 0 {
+            Option::None
+        } else {
+            Option::Some(bytes.slice(offset, qeidentity_bytes_len))
+        };
+        offset += qeidentity_bytes_len;
 
-//         let sgx_intel_root_ca_der: Option<Vec<u8>> = match sgx_intel_root_ca_der_len {
-//             0 => None,
-//             len => Some(slice[offset..offset + len].to_vec())
-//         };
-//         offset += sgx_intel_root_ca_der_len;
+        let sgx_intel_root_ca_der: Option<Span<u8>> = if sgx_intel_root_ca_der_len == 0 {
+            Option::None
+        } else {
+            Option::Some(bytes.slice(offset, sgx_intel_root_ca_der_len))
+        };
+        offset += sgx_intel_root_ca_der_len;
 
-//         let sgx_tcb_signing_der: Option<Vec<u8>> = match sgx_tcb_signing_der_len {
-//             0 => None,
-//             len => Some(slice[offset..offset + len].to_vec())
-//         };
-//         offset += sgx_tcb_signing_der_len;
+        let sgx_tcb_signing_der: Option<Span<u8>> = if sgx_tcb_signing_der_len == 0 {
+            Option::None
+        } else {
+            Option::Some(bytes.slice(offset, sgx_tcb_signing_der_len))
+        };
+        offset += sgx_tcb_signing_der_len;
 
-//         let sgx_pck_certchain_der: Option<Vec<u8>> = match sgx_pck_certchain_der_len {
-//             0 => None,
-//             len => Some(slice[offset..offset + len].to_vec())
-//         };
-//         offset += sgx_pck_certchain_der_len;
+        let sgx_pck_certchain_der: Option<Span<u8>> = if sgx_pck_certchain_der_len == 0 {
+            Option::None
+        } else {
+            Option::Some(bytes.slice(offset, sgx_pck_certchain_der_len))
+        };
+        offset += sgx_pck_certchain_der_len;
+        
+        let sgx_intel_root_ca_crl_der: Option<Span<u8>> = if sgx_intel_root_ca_crl_der_len == 0 {
+            Option::None
+        } else {
+            Option::Some(bytes.slice(offset, sgx_intel_root_ca_crl_der_len))
+        };
+        offset += sgx_intel_root_ca_crl_der_len;
 
-//         let sgx_intel_root_ca_crl_der: Option<Vec<u8>> = match sgx_intel_root_ca_crl_der_len {
-//             0 => None,
-//             len => Some(slice[offset..offset + len].to_vec())
-//         };
-//         offset += sgx_intel_root_ca_crl_der_len;
+        let sgx_pck_processor_crl_der: Option<Span<u8>> = if sgx_pck_processor_crl_der_len == 0 {
+            Option::None
+        } else {
+            Option::Some(bytes.slice(offset, sgx_pck_processor_crl_der_len))
+        };
+        offset += sgx_pck_processor_crl_der_len;
 
-//         let sgx_pck_processor_crl_der: Option<Vec<u8>> = match sgx_pck_processor_crl_der_len {
-//             0 => None,
-//             len => Some(slice[offset..offset + len].to_vec())
-//         };
-//         offset += sgx_pck_processor_crl_der_len;
+        let sgx_pck_platform_crl_der: Option<Span<u8>> = if sgx_pck_platform_crl_der_len == 0 {
+            Option::None
+        } else {
+            Option::Some(bytes.slice(offset, sgx_pck_platform_crl_der_len))
+        };
+        offset += sgx_pck_platform_crl_der_len;
 
-//         let sgx_pck_platform_crl_der: Option<Vec<u8>> = match sgx_pck_platform_crl_der_len {
-//             0 => None,
-//             len => Some(slice[offset..offset + len].to_vec())
-//         };
-//         offset += sgx_pck_platform_crl_der_len;
+        assert!(offset == bytes.len());
 
-//         assert!(offset == slice.len());
+        IntelCollateralDataRaw {
+            tcbinfo_bytes: tcbinfo_bytes,
+            qeidentity_bytes: qeidentity_bytes,
+            sgx_intel_root_ca_der,
+            sgx_tcb_signing_der,
+            sgx_pck_certchain_der,
+            sgx_intel_root_ca_crl_der,
+            sgx_pck_processor_crl_der,
+            sgx_pck_platform_crl_der,
+        }
+    }
 
-//         IntelCollateral {
-//             tcbinfo_bytes: tcbinfo_bytes,
-//             qeidentity_bytes: qeidentity_bytes,
-//             sgx_intel_root_ca_der,
-//             sgx_tcb_signing_der,
-//             sgx_pck_certchain_der,
-//             sgx_intel_root_ca_crl_der,
-//             sgx_pck_processor_crl_der,
-//             sgx_pck_platform_crl_der,
-//         }
-//     }
 
 //     pub fn get_tcbinfov2(&self) -> TcbInfoV2 {
 //         match &self.tcbinfo_bytes {
@@ -248,29 +247,29 @@ pub struct IntelCollateralData {
 //         self.qeidentity_bytes = Some(qeidentity_slice.to_vec());
 //     }
 
-//     pub fn get_sgx_intel_root_ca<'a>(&'a self) -> X509Certificate<'a> {
-//         match self.sgx_intel_root_ca_der {
-//             Some(ref der) => {
-//                 let cert = parse_x509_der(der);
-//                 cert
-//             },
-//             None => panic!("Intel Root CA not set"),
-//         }
-//     }
+    fn get_sgx_intel_root_ca(self: @IntelCollateralDataRaw) -> X509CertObj {
+        match self.sgx_intel_root_ca_der {
+            Option::Some(der) => {
+                let cert = der.deref().parse_x509_der();
+                cert
+            },
+            Option::None => panic!("Intel Root CA not set"),
+        }
+    }
 
 //     pub fn set_intel_root_ca_der(&mut self, intel_root_ca_der: &[u8]) {
 //         self.sgx_intel_root_ca_der = Some(intel_root_ca_der.to_vec());
 //     }
 
-//     pub fn get_sgx_tcb_signing<'a>(&'a self) -> X509Certificate<'a> {
-//         match self.sgx_tcb_signing_der {
-//             Some(ref der) => {
-//                 let cert = parse_x509_der(der);
-//                 cert
-//             },
-//             None => panic!("SGX TCB Signing Cert not set"),
-//         }
-//     }
+    fn get_sgx_tcb_signing(self: @IntelCollateralDataRaw) -> X509CertObj {
+        match self.sgx_tcb_signing_der {
+            Option::Some(der) => {
+                let cert = der.deref().parse_x509_der();
+                cert
+            },
+            Option::None => panic!("SGX TCB Signing Cert not set"),
+        }
+    }
 
 //     pub fn set_sgx_tcb_signing_der(&mut self, sgx_tcb_signing_der: &[u8]) {
 //         self.sgx_tcb_signing_der = Some(sgx_tcb_signing_der.to_vec());
@@ -316,15 +315,15 @@ pub struct IntelCollateralData {
 //         }
 //     }
 
-//     pub fn get_sgx_intel_root_ca_crl<'a>(&'a self) -> Option<CertificateRevocationList<'a>> {
-//         match &self.sgx_intel_root_ca_crl_der {
-//             Some(crl_der) => {
-//                 let crl = parse_crl_der(crl_der);
-//                 Some(crl)
-//             },
-//             None => None,
-//         }
-//     }
+    fn get_sgx_intel_root_ca_crl(self: @IntelCollateralDataRaw) -> Option<X509CRLObj> {
+        match self.sgx_intel_root_ca_crl_der {
+            Option::Some(crl_der) => {
+                let crl = crl_der.deref().parse_crl_der();
+                Option::Some(crl)
+            },
+            Option::None => Option::None,
+        }
+    }
 
 //     pub fn set_sgx_intel_root_ca_crl_der(&mut self, sgx_intel_root_ca_crl_der: &[u8]) {
 //         self.sgx_intel_root_ca_crl_der = Some(sgx_intel_root_ca_crl_der.to_vec());
@@ -336,15 +335,16 @@ pub struct IntelCollateralData {
 //         self.sgx_intel_root_ca_crl_der = Some(sgx_intel_root_ca_crl_der);
 //     }
 
-//     pub fn get_sgx_pck_processor_crl<'a>(&'a self) -> Option<CertificateRevocationList<'a>> {
-//         match &self.sgx_pck_processor_crl_der {
-//             Some(crl_der) => {
-//                 let crl = parse_crl_der(crl_der);
-//                 Some(crl)
-//             },
-//             None => None,
-//         }
-//     }
+    fn get_sgx_pck_processor_crl(self: @IntelCollateralDataRaw) -> Option<X509CRLObj> {
+        println!("get_sgx_pck_processor_crl");
+        match self.sgx_pck_processor_crl_der {
+            Option::Some(crl_der) => {
+                let crl = crl_der.deref().parse_crl_der();
+                Option::Some(crl)
+            },
+            Option::None => Option::None,
+        }
+    }
 
 //     pub fn set_sgx_processor_crl_der(&mut self, sgx_pck_processor_crl_der: &[u8]) {
 //         self.sgx_pck_processor_crl_der = Some(sgx_pck_processor_crl_der.to_vec());
@@ -356,15 +356,15 @@ pub struct IntelCollateralData {
 //         self.sgx_pck_processor_crl_der = Some(sgx_pck_processor_crl_der);
 //     }
 
-//     pub fn get_sgx_pck_platform_crl<'a>(&'a self) -> Option<CertificateRevocationList<'a>> {
-//         match &self.sgx_pck_platform_crl_der {
-//             Some(crl_der) => {
-//                 let crl = parse_crl_der(crl_der);
-//                 Some(crl)
-//             },
-//             None => None, 
-//         }
-//     }
+    fn get_sgx_pck_platform_crl(self: @IntelCollateralDataRaw) -> Option<X509CRLObj> {
+        match self.sgx_pck_platform_crl_der {
+            Option::Some(crl_der) => {
+                let crl = crl_der.deref().parse_crl_der();
+                Option::Some(crl)
+            },
+            Option::None => Option::None, 
+        }
+    }
 
 //     pub fn set_sgx_platform_crl_der(&mut self, sgx_pck_platform_crl_der: &[u8]) {
 //         self.sgx_pck_platform_crl_der = Some(sgx_pck_platform_crl_der.to_vec());
@@ -377,24 +377,4 @@ pub struct IntelCollateralData {
 //     }
 // }
 
-// impl IntelCollateralImpl of IntelCollateral {
-//     fn get_sgx_tcb_signing(collaterals: @IntelCollateral) -> X509CertificateData {
-//         match collaterals.sgx_tcb_signing_der {
-//             Some(der) => parse_x509_der(der),
-//             None => panic!("SGX TCB Signing Cert not set"),
-//         }
-//     }
-// }
-
-// fn get_sgx_tcb_signing(collaterals: @IntelCollateral) -> X509CertificateData {
-//     match collaterals.sgx_tcb_signing_der {
-//         Some(der) => parse_x509_der(der),
-//         None => panic!("SGX TCB Signing Cert not set"),
-//     }
-// }
-
-//get_sgx_intel_root_ca
-//get_sgx_pck_certchain
-//get_sgx_intel_root_ca_crl
-//get_sgx_pck_processor_crl
-//get_sgx_pck_platform_crl
+}

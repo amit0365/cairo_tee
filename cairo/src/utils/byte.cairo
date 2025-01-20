@@ -199,18 +199,35 @@ impl ArrayU8Ext of ArrayU8ExtTrait {
 }
 
 // Accepts felt252 for efficiency as it's the type of retdata but all values are expected to fit u32
+// fn u32s_to_u256(arr: Span<felt252>) -> u256 {
+//     assert!(arr.len() == 8, "u32s_to_u256: input must be 8 elements long");
+//     let low = *arr.at(7)
+//         + *arr.at(6) * 0x1_0000_0000
+//         + *arr.at(5) * 0x1_0000_0000_0000_0000
+//         + *arr.at(4) * 0x1_0000_0000_0000_0000_0000_0000;
+//     let low = low.try_into().expect('u32s_to_u256:overflow-low');
+//     let high = *arr.at(3)
+//         + *arr.at(2) * 0x1_0000_0000
+//         + *arr.at(1) * 0x1_0000_0000_0000_0000
+//         + *arr.at(0) * 0x1_0000_0000_0000_0000_0000_0000;
+//     let high = high.try_into().expect('u32s_to_u256:overflow-high');
+//     u256 { high, low }
+// }
+
 fn u32s_to_u256(arr: Span<felt252>) -> u256 {
     assert!(arr.len() == 8, "u32s_to_u256: input must be 8 elements long");
-    let low = *arr.at(7)
-        + *arr.at(6) * 0x1_0000_0000
-        + *arr.at(5) * 0x1_0000_0000_0000_0000
-        + *arr.at(4) * 0x1_0000_0000_0000_0000_0000_0000;
+    let low = *arr.at(0)  // Changed from 7
+        + *arr.at(1) * 0x1_0000_0000  // Changed from 6
+        + *arr.at(2) * 0x1_0000_0000_0000_0000  // Changed from 5
+        + *arr.at(3) * 0x1_0000_0000_0000_0000_0000_0000;  // Changed from 4
     let low = low.try_into().expect('u32s_to_u256:overflow-low');
-    let high = *arr.at(3)
-        + *arr.at(2) * 0x1_0000_0000
-        + *arr.at(1) * 0x1_0000_0000_0000_0000
-        + *arr.at(0) * 0x1_0000_0000_0000_0000_0000_0000;
+    
+    let high = *arr.at(4)  // Changed from 3
+        + *arr.at(5) * 0x1_0000_0000  // Changed from 2
+        + *arr.at(6) * 0x1_0000_0000_0000_0000  // Changed from 1
+        + *arr.at(7) * 0x1_0000_0000_0000_0000_0000_0000;  // Changed from 0
     let high = high.try_into().expect('u32s_to_u256:overflow-high');
+    
     u256 { high, low }
 }
 
@@ -581,15 +598,18 @@ pub fn felt252s_to_u64(arr: Span<felt252>) -> u64 {
     value.try_into().expect('felt252s_to_u64:overflow')
 }
 
-pub fn u8_to_u16(arr: Span<u8>) -> u16 {
+pub fn u8_to_u16_le(arr: Span<u8>) -> u16 {
     assert!(arr.len() == 2, "u8_to_u16: input must be 2 elements long");
-    let value: u16 = (*arr.at(0)).into() * 0x100_u16 + (*arr.at(1)).into();
+    let value: u16 = (*arr.at(1)).into() * 0x100_u16 + (*arr.at(0)).into();
     value
 }
 
-pub fn u8_to_u32(arr: Span<u8>) -> u32 {
+pub fn u8_to_u32_le(arr: Span<u8>) -> u32 {
     assert!(arr.len() == 4, "u8_to_u32: input must be 4 elements long");
-    let value: u32 = (*arr.at(0)).into() * 0x100_u32 + (*arr.at(1)).into() * 0x100_u32 + (*arr.at(2)).into() * 0x100_u32 + (*arr.at(3)).into();
+    let value: u32 = (*arr.at(3)).into() * 0x1000000_u32 + 
+                     (*arr.at(2)).into() * 0x10000_u32 + 
+                     (*arr.at(1)).into() * 0x100_u32 + 
+                     (*arr.at(0)).into();
     value
 }
 
@@ -597,4 +617,47 @@ pub fn u8_to_u64(arr: Span<u8>) -> u64 {
     assert!(arr.len() == 8, "u8_to_u64: input must be 8 elements long");
     let value: u64 = (*arr.at(0)).into() * 0x100_u64 + (*arr.at(1)).into() * 0x100_u64 + (*arr.at(2)).into() * 0x100_u64 + (*arr.at(3)).into() * 0x100_u64 + (*arr.at(4)).into() * 0x100_u64 + (*arr.at(5)).into() * 0x100_u64 + (*arr.at(6)).into() * 0x100_u64 + (*arr.at(7)).into();
     value
+}
+
+pub fn u8_to_u32_be(arr: Span<u8>) -> u32 {
+    assert!(arr.len() == 4, "u8_to_u32: input must be 4 elements long");
+    let value: u32 = (*arr.at(0)).into() * 0x1000000_u32 + 
+                     (*arr.at(1)).into() * 0x10000_u32 + 
+                     (*arr.at(2)).into() * 0x100_u32 + 
+                     (*arr.at(3)).into();
+    value
+}
+
+pub fn read_bytes_n(arr: Span<u8>, ix: u256, length_bytes_len: u8) -> u256 {
+    let mut result: u256 = 0;
+    let mut i: u8 = 0;
+    
+    // Read bytes into result
+    loop {
+        if i >= length_bytes_len { break; }
+        let byte_index = (ix + i.into()).try_into().unwrap();
+        // Shift left by (length_bytes_len - 1 - i) * 8 to match Solidity's behavior
+        let shift = (length_bytes_len - 1 - i) * 8;
+        result += (*arr.at(byte_index)).into() * pow_256(shift.into());
+        i += 1;
+    };
+
+    // Shift right by (32 - length_bytes_len) * 8 to match Solidity
+    let denominator = pow_256(((32 - length_bytes_len) * 8).into());
+    result / denominator
+}
+
+// Helper function for power of 256
+fn pow_256(exp: u256) -> u256 {
+    if exp == 0 { 
+        return 1; 
+    }
+    let mut result = 1;
+    let mut i = 0;
+    loop {
+        if i >= exp { break; }
+        result *= 256;
+        i += 1;
+    };
+    result
 }

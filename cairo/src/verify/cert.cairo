@@ -4,6 +4,7 @@ use cairo::verify::crypto::verify_p256_signature;
 use super::super::utils::byte::ArrayU8ExtTrait;
 use core::sha256::compute_sha256_byte_array;
 use cairo::utils::x509_decode::X509CertObj;
+use crate::utils::x509crl_decode::X509CRLObj;
 use crate::utils::pck_parse::PCKCertTCB;
 use crate::types::tcbinfo::TcbInfoV3;
 use crate::types::TcbStatus;
@@ -29,8 +30,7 @@ use core::array::SpanIntoIterator;
 
 pub fn verify_certificate(cert: @X509CertObj, signer_cert: @X509CertObj) -> bool {
     // verifies that the certificate is valid
-    let data = cert.tbs.deref().into_byte_array();
-    let data_hash: u256 = u32s_typed_to_u256(@compute_sha256_byte_array(@data));
+    let data_hash: u256 = sha256_as_u256(cert.tbs.deref().into_byte_array());
 
     let (signature_r, signature_s) = cert.signature;
     let signature_r = @SpanU8TryIntoU256::try_into(signature_r.deref()).unwrap();
@@ -46,20 +46,23 @@ pub fn verify_certificate(cert: @X509CertObj, signer_cert: @X509CertObj) -> bool
     verify_p256_signature(data_hash, (public_key_x, public_key_y), signature_r, signature_s)
 }
 
-pub fn verify_crl(crl: @CertificateRevocationList, signer_cert: @X509CertObj) -> bool {
+pub fn verify_crl(crl: @X509CRLObj, signer_cert: @X509CertObj) -> bool {
     // verifies that the crl is valid
-    let data = TbsCertificateDataListImpl::as_ref(crl.tbs_cert_list);
-    let data_hash: u256 = u32s_typed_to_u256(@compute_sha256_byte_array(@data.into_byte_array()));
+    let data = crl.tbs;
+    let data_hash: u256 = sha256_as_u256(data.deref().into_byte_array());
 
-    let signature = crl.signature_value;
+    let (signature_r, signature_s) = crl.signature;
+    let signature_r = @SpanU8TryIntoU256::try_into(signature_r.deref()).unwrap();
+    let signature_s = @SpanU8TryIntoU256::try_into(signature_s.deref()).unwrap();
+
     let (public_key_x, public_key_y) = signer_cert.subject_public_key;
     let public_key_x = @SpanU8TryIntoU256::try_into(public_key_x.deref()).unwrap();
     let public_key_y = @SpanU8TryIntoU256::try_into(public_key_y.deref()).unwrap();
     // make sure that the issuer is the signer
-    if crl.tbs_cert_list.issuer.raw != signer_cert.subject_common_name {
+    if crl.issuer_common_name != signer_cert.subject_common_name {
         return false;
     }
-    verify_p256_signature(data_hash, (public_key_x, public_key_y), signature.r, signature.s)
+    verify_p256_signature(data_hash, (public_key_x, public_key_y), signature_r, signature_s)
 }
 
 // pub fn validate_certificate(
@@ -195,3 +198,14 @@ pub fn is_cert_revoked(
 //     };
 //     (sgx_tcb_status, tdx_tcb_status, advisory_ids)
 // }
+
+/// computes the sha256 of the input and returns it as a u256.
+pub fn sha256_as_u256(input: ByteArray) -> u256 {
+    let hash_result = compute_sha256_byte_array(@input);
+    let mut value: u256 = 0;
+    for word in hash_result.span() {
+        value *= 0x100000000;
+        value = value + (*word).into();
+    };
+    value
+}

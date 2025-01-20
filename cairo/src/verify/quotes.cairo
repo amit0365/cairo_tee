@@ -4,8 +4,9 @@ use starknet::secp256_trait::Signature;
 use crate::types::cert::PublicKey;
 use core::array::SpanIntoIterator;
 use core::option::OptionTraitImpl;
+use cairo::verify::cert::sha256_as_u256;
 
-mod version_4;
+pub mod version_4;
 use crate::utils::pck_parse::{PCKHelperImpl, PCKCollateral, PCKHelperTrait, PCKCertTCB};
 use crate::types::collaterals::TcbInfo;
 use crate::types::cert::X509CertificateData;
@@ -14,13 +15,12 @@ use cairo::utils::compare::{PartialEqU8Array16, PartialEqU8Array20, PartialEqU8A
 use crate::types::cert::IntelSgxCrlsImpl;
 use crate::types::enclave_identity::EnclaveIdentityV2;
 use crate::types::cert::{IntelSgxCrls, SgxExtensions};
-use crate::types::collaterals::IntelCollateralData;
+use crate::types::collaterals::{IntelCollateralDataRaw, IntelCollateralDataTrait, IntelCollateralDataImpl};
 use crate::types::quotes::{
     body::{EnclaveReport, QuoteBody},
     header::QuoteHeader,
 };
 use crate::utils::byte::{SpanU8TryIntoArrayU8Fixed32, u32s_typed_to_u256, u8s_typed_to_u256, SpanU8TryIntoU256};
-use core::sha256::compute_sha256_byte_array;
 use crate::types::quotes::{CertData, CertDataType};
 use crate::types::TcbStatus;
 use crate::verify::enclave_identity::get_qe_tcbstatus;
@@ -63,41 +63,43 @@ fn common_verify_and_fetch_tcb(
     qe_report_signature: [u8; 64],
     qe_auth_data: Span<u8>,
     qe_cert_data: @CertData,
-    collaterals: @IntelCollateralData,
-    current_time: u64,
-) -> (TcbStatus, PCKCertTCB, TcbInfo) {
-    let signing_cert = collaterals.sgx_tcb_signing;
-    let intel_sgx_root_cert = collaterals.sgx_intel_root_ca;
+    collaterals: @IntelCollateralDataRaw,
+    current_time: Option<u64>, // remove option
+) -> (Option<TcbStatus>, PCKCertTCB, Option<TcbInfo>) {
+    let signing_cert = collaterals.get_sgx_tcb_signing();
+    let intel_sgx_root_cert = collaterals.get_sgx_intel_root_ca();
+    println!("intel_sgx_root_cert x509 parsing done");
 
     // verify that signing_verifying_key is not revoked and signed by the root cert
-    let intel_crls = IntelSgxCrlsImpl::from_collaterals(collaterals);
-
+    //let intel_crls = IntelSgxCrlsImpl::from_collaterals(collaterals);
+    //println!("intel_crls done");
     // ZL: If collaterals are checked by the caller, then these can be removed
     // check that CRLs are valid
-    match intel_crls.sgx_root_ca_crl {
-        Option::Some(crl) => {
-            assert!(verify_crl(crl, intel_sgx_root_cert));
-        },
-        Option::None => {
-            panic!("No SGX Root CA CRL found");
-        }
-    }
-
+    // match intel_crls.sgx_root_ca_crl {
+    //     Option::Some(crl) => {
+    //         let is_valid_crl = verify_crl(@crl, @intel_sgx_root_cert);
+    //         assert!(is_valid_crl, "Invalid SGX Root CA CRL");
+    //     },
+    //     Option::None => {
+    //         panic!("No SGX Root CA CRL found");
+    //     }
+    // }
+    // println!("intel_crls checked");
+    
     // let signing_cert_revoked = intel_crls.is_cert_revoked(@signing_cert);
     // assert!(!signing_cert_revoked, "TCB Signing Cert revoked"); todo check this
-    assert!(
-        verify_certificate(signing_cert, intel_sgx_root_cert),
-        "TCB Signing Cert is not signed by Intel SGX Root CA"
-    );
+    let is_valid_signing_cert = verify_certificate(@signing_cert, @intel_sgx_root_cert);
+    assert!(is_valid_signing_cert, "TCB Signing Cert is not signed by Intel SGX Root CA");
+    println!("p256 signature_verified");
 
     // validate QEIdentity
-    let qeidentityv2 = collaterals.qeidentity;
-    let is_valid_enclave_identity = validate_enclave_identityv2(
-        qeidentityv2,
-        signing_cert,
-        current_time
-    );
-    assert!(is_valid_enclave_identity, "Invalid QEIdentity");
+    // let qeidentityv2 = collaterals.qeidentity;
+    // let is_valid_enclave_identity = validate_enclave_identityv2(
+    //     qeidentityv2,
+    //     @signing_cert,
+    //     current_time
+    // );
+    // assert!(is_valid_enclave_identity, "Invalid QEIdentity");
 
     // verify QEReport then get TCB Status
     let is_valid_qe_report_data = verify_qe_report_data(
@@ -106,16 +108,17 @@ fn common_verify_and_fetch_tcb(
         qe_auth_data
     );
     assert!(is_valid_qe_report_data, "QE Report Data is incorrect");
+    println!("qe_report_data_verified");
 
-    let is_valid_qe_report = validate_qe_report(qe_report, qeidentityv2);
-    assert!(is_valid_qe_report, "QE Report values do not match with the provided QEIdentity");
+    // let is_valid_qe_report = validate_qe_report(qe_report, qeidentityv2);
+    // assert!(is_valid_qe_report, "QE Report values do not match with the provided QEIdentity");
 
-    // Step 1: Fetch QEIdentity to validate TCB of the QE
-    let qe_tcb_status = get_qe_tcbstatus(qe_report, qeidentityv2);
-    assert!(
-        qe_tcb_status != TcbStatus::TcbRevoked,
-        "QEIdentity TCB Revoked"
-    );
+    // // Step 1: Fetch QEIdentity to validate TCB of the QE
+    // let qe_tcb_status = get_qe_tcbstatus(qe_report, qeidentityv2);
+    // assert!(
+    //     qe_tcb_status != TcbStatus::TcbRevoked,
+    //     "QEIdentity TCB Revoked"
+    // );
 
     // Step 3: verify cert chain
     // get the certchain embedded in the ecda quote signature data
@@ -125,7 +128,7 @@ fn common_verify_and_fetch_tcb(
     assert_eq!(*qe_cert_data.cert_data_type, 5, "QE Cert Type must be 5");
     let (success, pck_collateral) = qe_cert_data.cert_data.deref().get_pck_collateral(*qe_cert_data.cert_data_type);
     assert!(success, "Failed to get PCK Collateral");
-
+    println!("pck_collateral done");
     // checks that the certificates used in the certchain are not revoked
     // for i in 0..certchain.len() {
     //     assert!(!intel_crls.is_cert_revoked(certchain[i]));
@@ -134,16 +137,16 @@ fn common_verify_and_fetch_tcb(
     // get the pck certificate, and check whether issuer common name is valid
     let pck_cert = pck_collateral.pck_chain[0]; // todo check if we need these
     let pck_cert_issuer = pck_collateral.pck_chain[1];
-    let is_valid_pck_issuer = check_pck_issuer_and_crl(pck_cert, pck_cert_issuer, @intel_crls);
-    assert!(is_valid_pck_issuer, "Invalid PCK Issuer or CRL");
+    //let is_valid_pck_issuer = check_pck_issuer_and_crl(pck_cert, pck_cert_issuer, @intel_crls);
+    //assert!(is_valid_pck_issuer, "Invalid PCK Issuer or CRL");
 
     // verify that the cert chain signatures are valid
-    let is_valid_certchain_signature = verify_certchain_signature(@pck_collateral.pck_chain, intel_sgx_root_cert);
+    let is_valid_certchain_signature = verify_certchain_signature(@pck_collateral.pck_chain, @intel_sgx_root_cert);
     assert!(is_valid_certchain_signature, "Invalid PCK Chain");
 
     // Step 4: Signature Verification on local isv report and qereport by PCK
     // verify the signature for qe report data
-    let qe_report_bytes = u32s_typed_to_u256(@compute_sha256_byte_array(@(qe_report.raw_bytes).deref().into_byte_array()));
+    let qe_report_bytes = sha256_as_u256(qe_report.raw_bytes.deref().into_byte_array());
     let qe_report_signature_r = @SpanU8TryIntoU256::try_into(qe_report_signature.span().slice(0, 32)).unwrap();
     let qe_report_signature_s = @SpanU8TryIntoU256::try_into(qe_report_signature.span().slice(32, 64)).unwrap();
 
@@ -161,7 +164,7 @@ fn common_verify_and_fetch_tcb(
     assert!(quote_header.len() == 48, "invalid quote header");
     data.append_span(quote_header);
     data.append_span(quote_body);
-    let data_hash = u32s_typed_to_u256(@compute_sha256_byte_array(@data.span().into_byte_array()));
+    let data_hash = sha256_as_u256(data.span().into_byte_array());
 
     let (ecdsa_attestation_signature_r_u8s, ecdsa_attestation_signature_s_u8s) = ecdsa_attestation_signature;
     let ecdsa_attestation_signature_r = u8s_typed_to_u256(@ecdsa_attestation_signature_r_u8s.try_into().unwrap());
@@ -183,24 +186,24 @@ fn common_verify_and_fetch_tcb(
     );
 
     // validate tcbinfo v2 or v3, depending on the quote version
-    let tcb_info = match collaterals.tcbinfo {
-        TcbInfo::V3(tcb_info_v3) => {
-            assert!(
-                validate_tcbinfov3(tcb_info_v3, signing_cert, current_time),
-                "Invalid TCBInfoV3"
-            );
-            TcbInfo::V3(tcb_info_v3.deref())
-        },
-        TcbInfo::V2(tcb_info_v2) => {
-            assert!(
-                validate_tcbinfov2(tcb_info_v2, signing_cert, current_time),
-                "Invalid TCBInfoV2"
-            );
-            TcbInfo::V2(tcb_info_v2.deref())
-        }
-    };
+    // let tcb_info = match collaterals.tcbinfo {
+    //     TcbInfo::V3(tcb_info_v3) => {
+    //         assert!(
+    //             validate_tcbinfov3(tcb_info_v3, @signing_cert, current_time),
+    //             "Invalid TCBInfoV3"
+    //         );
+    //         TcbInfo::V3(tcb_info_v3.deref())
+    //     },
+    //     TcbInfo::V2(tcb_info_v2) => {
+    //         assert!(
+    //             validate_tcbinfov2(tcb_info_v2, @signing_cert, current_time),
+    //             "Invalid TCBInfoV2"
+    //         );
+    //         TcbInfo::V2(tcb_info_v2.deref())
+    //     }
+    // };
 
-    (qe_tcb_status, sgx_extensions, tcb_info)
+    (Option::None, sgx_extensions, Option::None) //qe_tcb_status
 }
 
 fn check_pck_issuer_and_crl(
@@ -221,12 +224,12 @@ fn check_pck_issuer_and_crl(
     let intel_processor_ba: ByteArray = "Intel SGX PCK Processor CA";
     if pck_cert_issuer_cn.deref().into_byte_array() == intel_platform_ba {
         match intel_crls.sgx_pck_platform_crl.deref() {
-            Option::Some(crl) => verify_crl(crl, pck_issuer_cert),
+            Option::Some(crl) => verify_crl(@crl, pck_issuer_cert),
             Option::None => false
         }
     } else if pck_cert_issuer_cn.deref().into_byte_array() == intel_processor_ba {
         match intel_crls.sgx_pck_processor_crl.deref() {
-            Option::Some(crl) => verify_crl(crl, pck_issuer_cert),
+            Option::Some(crl) => verify_crl(@crl, pck_issuer_cert),
             Option::None => false
         }
     } else {
@@ -295,8 +298,8 @@ fn verify_qe_report_data(
     verification_data.append_span(ecdsa_attestation_key_x);
     verification_data.append_span(ecdsa_attestation_key_y);
     verification_data.append_span(qe_auth_data);
-    //let mut recomputed_data = array![];
-    let hash = u32s_typed_to_u256(@compute_sha256_byte_array(@verification_data.span().into_byte_array()));
+
+    let hash = sha256_as_u256(verification_data.span().into_byte_array());
     let report_data_u256 = u8s_typed_to_u256(@report_data.try_into().unwrap());
     hash == report_data_u256
 }

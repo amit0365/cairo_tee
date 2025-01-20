@@ -1,6 +1,6 @@
 use alexandria_bytes::BytesTrait;
 use core::traits::TryInto;
-use cairo::utils::byte::{felt252s_to_u8s, SpanU8TryIntoArrayU8Fixed2, SpanU8TryIntoArrayU8Fixed4,
+use cairo::utils::byte::{felt252s_to_u8s, u8_to_u16_le, SpanU8TryIntoArrayU8Fixed2, SpanU8TryIntoArrayU8Fixed4,
     SpanU8TryIntoArrayU8Fixed96, SpanU8TryIntoArrayU8Fixed20, SpanU8TryIntoArrayU8Fixed28, 
     SpanU8TryIntoArrayU8Fixed16, SpanU8TryIntoArrayU8Fixed32, SpanU8TryIntoArrayU8Fixed64, 
     SpanU8TryIntoArrayU8Fixed60, SpanU8TryIntoArrayU8Fixed48, felt252s_to_u32, felt252s_to_u16, felt252s_to_u64};
@@ -95,9 +95,6 @@ impl TD10ReportBodyImpl of TD10ReportBodyFromBytes {
     }
 }
 
-trait EnclaveReportFromBytes {
-    fn from_bytes(raw_bytes: Span<felt252>) -> EnclaveReport;
-}
 
 #[derive(Drop, Copy, PartialEq)]
 pub struct EnclaveReport {
@@ -146,22 +143,22 @@ pub struct EnclaveReport {
     pub raw_bytes: Span<u8>,
 }
 
+#[generate_trait]
 impl EnclaveReportImpl of EnclaveReportFromBytes {
-    fn from_bytes(raw_bytes: Span<felt252>) -> EnclaveReport{
+    fn from_bytes(raw_bytes: Span<u8>) -> EnclaveReport{
         assert_eq!(raw_bytes.len(), 384);
-        let cpu_svn: [u8; 16] = felt252s_to_u8s(raw_bytes.slice(0, 16)).try_into().unwrap();
-        let misc_select: [u8; 4] = felt252s_to_u8s(raw_bytes.slice(16, 4)).try_into().unwrap();
-        let reserved_1: [u8; 28] = felt252s_to_u8s(raw_bytes.slice(20, 28)).try_into().unwrap();
-        let attributes: [u8; 16] = felt252s_to_u8s(raw_bytes.slice(48, 16)).try_into().unwrap();
-        let mrenclave: [u8; 32] = felt252s_to_u8s(raw_bytes.slice(64, 32)).try_into().unwrap();
-        let reserved_2: [u8; 32] = felt252s_to_u8s(raw_bytes.slice(96, 32)).try_into().unwrap();
-        let mrsigner: [u8; 32] = felt252s_to_u8s(raw_bytes.slice(128, 32)).try_into().unwrap();
-        let reserved_3: [u8; 96] = felt252s_to_u8s(raw_bytes.slice(160, 96)).try_into().unwrap();
-        let isv_prod_id: u16 = felt252s_to_u16(raw_bytes.slice(256, 2));
-        let isv_svn: u16 = felt252s_to_u16(raw_bytes.slice(258, 2));
-        let reserved_4: [u8; 60] = felt252s_to_u8s(raw_bytes.slice(260, 60)).try_into().unwrap();
-        let report_data: [u8; 64] = felt252s_to_u8s(raw_bytes.slice(320, 64)).try_into().unwrap();
-        let raw_bytes = felt252s_to_u8s(raw_bytes);
+        let cpu_svn: [u8; 16] = raw_bytes.slice(0, 16).try_into().unwrap();
+        let misc_select: [u8; 4] = raw_bytes.slice(16, 4).try_into().unwrap();
+        let reserved_1: [u8; 28] = raw_bytes.slice(20, 28).try_into().unwrap();
+        let attributes: [u8; 16] = raw_bytes.slice(48, 16).try_into().unwrap();
+        let mrenclave: [u8; 32] = raw_bytes.slice(64, 32).try_into().unwrap();
+        let reserved_2: [u8; 32] = raw_bytes.slice(96, 32).try_into().unwrap();
+        let mrsigner: [u8; 32] = raw_bytes.slice(128, 32).try_into().unwrap();
+        let reserved_3: [u8; 96] = raw_bytes.slice(160, 96).try_into().unwrap();
+        let isv_prod_id: u16 = u8_to_u16_le(raw_bytes.slice(256, 2));
+        let isv_svn: u16 = u8_to_u16_le(raw_bytes.slice(258, 2));
+        let reserved_4: [u8; 60] = raw_bytes.slice(260, 60).try_into().unwrap();
+        let report_data: [u8; 64] = raw_bytes.slice(320, 64).try_into().unwrap();
 
         EnclaveReport{
             cpu_svn,
